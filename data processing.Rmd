@@ -1,0 +1,83 @@
+---
+title: "CV Growth"
+output: html_document
+date: '2022-10-25'
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+setwd("/Users/alishamsaley/Documents/GitHub/CV_growth/data files")
+library(readxl)
+sw = read_xlsx("treatment monitoring.xlsx")
+gro = read_xlsx("CV mass data.xlsx") 
+  
+```
+
+looking at treatments through time
+```{r}
+boxplot(sw$S ~ sw$`Bucket#`)
+boxplot(sw$T_c ~ sw$`Bucket#`)
+boxplot(sw$pH ~ sw$`Bucket#`)
+boxplot(sw$DO_sat ~ sw$`Bucket#`)
+boxplot(sw$TA ~ sw$`Bucket#`)
+boxplot(sw$TA ~ sw$TA.treat)
+boxplot(sw$S ~ sw$Sal.treat)
+
+```
+
+looking at growth differences
+```{r}
+```
+
+looking at energy allocation
+```{r}
+gro$CI = gro$gut.wt/gro$shell.wt
+
+boxplot(gro$gut.wt ~ gro$TA.treat)
+boxplot(gro$gut.wt ~ gro$sal.treat)
+boxplot(gro$shell.wt ~ gro$TA.treat)
+boxplot(gro$shell.wt ~ gro$sal.treat)
+boxplot(gro$CI ~ gro$TA.treat)
+boxplot(gro$CI ~ gro$sal.treat)
+boxplot(gro$`%oc.ic.shell` ~ gro$TA.treat, ylim = c(-1,3))
+boxplot(gro$`%oc.ic.shell` ~ gro$sal.treat, ylim = c(-1,3))
+
+summary(lm(gro$gut.wt ~ gro$TA.treat + gro$sal.treat))
+summary(lm(gro$CI ~ gro$TA.treat + gro$sal.treat))
+summary(lm(gro$`%oc.ic.shell` ~ gro$TA.treat + gro$sal.treat))
+
+pre = gro[gro$Plate == "pre",]
+post = gro[gro$Plate == "post",]
+
+grow = gro[gro$Plate == 1 | gro$Plate == 2 |gro$Plate == 3 | gro$Plate == 4| gro$Plate == 5 |gro$Plate == 6 | gro$Plate == 7| gro$Plate == 8| gro$Plate == 9| gro$Plate == 10| gro$Plate == 11| gro$Plate == 12,]
+
+plot(pre$gut.wt ~ pre$shell.wt, pch = 19)
+
+
+```
+
+looking at shell properties
+```{r}
+```
+
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
