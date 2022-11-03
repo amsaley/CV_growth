@@ -7,7 +7,8 @@ editor_options:
 ---
 
 ```{r}
-setwd("/Users/alishamsaley/Documents/GitHub/CV_growth/data files")
+#setwd("/Users/alishamsaley/Documents/GitHub/CV_growth/data files")
+setwd("~/Documents/Data_Git Hub/Mussels/CV_growth/data files")
 library(readxl)
 sw = read_xlsx("treatment monitoring.xlsx")
 gro = read_xlsx("CV mass data.xlsx") 
@@ -16,13 +17,49 @@ gro = read_xlsx("CV mass data.xlsx")
 
 looking at treatments through time
 ```{r}
-boxplot(sw$S ~ sw$`Bucket#`)
+boxplot(sw[sw$fresh_old == "fresh",]$S ~ sw[sw$fresh_old == "fresh",]$`Bucket#`)
 boxplot(sw$T_c ~ sw$`Bucket#`)
-boxplot(sw$pH ~ sw$`Bucket#`)
-boxplot(sw$DO_sat ~ sw$`Bucket#`)
-boxplot(sw$TA ~ sw$`Bucket#`)
-boxplot(sw$TA ~ sw$TA.treat)
-boxplot(sw$S ~ sw$Sal.treat)
+boxplot(sw[sw$fresh_old == "fresh",]$pH ~ sw[sw$fresh_old == "fresh",]$`Bucket#`)
+boxplot(sw[sw$fresh_old == "fresh",]$DO_sat ~ sw[sw$fresh_old == "fresh",]$`Bucket#`)
+boxplot(sw[sw$fresh_old == "fresh",]$TA ~ sw[sw$fresh_old == "fresh",]$`Bucket#`)
+boxplot(sw[sw$fresh_old == "fresh",]$TA ~ sw[sw$fresh_old == "fresh",]$TA.treat)
+boxplot(sw[sw$fresh_old == "fresh",]$S ~ sw[sw$fresh_old == "fresh",]$Sal.treat)
+
+#calculating medians
+b1.ta = median(sw[sw$`Bucket#` == 1,]$TA)
+b2.ta = median(sw[sw$`Bucket#` == 2,]$TA)
+b3.ta = median(sw[sw$`Bucket#` == 3,]$TA)
+b4.ta = median(sw[sw$`Bucket#` == 4,]$TA)
+b5.ta = median(sw[sw$`Bucket#` == 5,]$TA)
+b6.ta = median(sw[sw$`Bucket#` == 6,]$TA)
+b7.ta = median(sw[sw$`Bucket#` == 7,]$TA)
+b8.ta = median(sw[sw$`Bucket#` == 8,]$TA)
+b9.ta = median(sw[sw$`Bucket#` == 9,]$TA)
+b10.ta = median(sw[sw$`Bucket#` == 10,]$TA)
+b11.ta = median(sw[sw$`Bucket#` ==11,]$TA)
+b12.ta = median(sw[sw$`Bucket#` == 12,]$TA)
+b13.ta = median(sw[sw$`Bucket#` == 13,]$TA)
+b14.ta = median(sw[sw$`Bucket#` == 14,]$TA)
+
+#adding a column to gro
+gro$med.ta = 0
+gro$med.ta[gro$`Bucket#` == 1] <- b1.ta
+gro$med.ta[gro$`Bucket#` == 2] <- b2.ta
+gro$med.ta[gro$`Bucket#` == 3] <- b3.ta
+gro$med.ta[gro$`Bucket#` == 4] <- b4.ta
+gro$med.ta[gro$`Bucket#` == 5] <- b5.ta
+gro$med.ta[gro$`Bucket#` == 6] <- b6.ta
+gro$med.ta[gro$`Bucket#` == 7] <- b7.ta
+gro$med.ta[gro$`Bucket#` == 8] <- b8.ta
+gro$med.ta[gro$`Bucket#` == 9] <- b9.ta
+gro$med.ta[gro$`Bucket#` == 10] <- b10.ta
+gro$med.ta[gro$`Bucket#` == 11] <- b11.ta
+gro$med.ta[gro$`Bucket#` == 12] <- b12.ta
+gro$med.ta[gro$`Bucket#` == 13] <- b13.ta
+gro$med.ta[gro$`Bucket#` == 14] <- b14.ta
+
+
+
 
 ```
 
@@ -40,17 +77,37 @@ boxplot(gro$shell.wt ~ gro$TA.treat)
 boxplot(gro$shell.wt ~ gro$sal.treat)
 boxplot(gro$CI ~ gro$TA.treat)
 boxplot(gro$CI ~ gro$sal.treat)
-boxplot(gro$`%oc.ic.shell` ~ gro$TA.treat, ylim = c(-1,3))
-boxplot(gro$`%oc.ic.shell` ~ gro$sal.treat, ylim = c(-1,3))
+boxplot(gro[gro$`%oc.ic.shell` > 0.04,]$`%oc.ic.shell` ~ gro[gro$`%oc.ic.shell` > 0.04,]$TA.treat, ylim = c(-1,3))
+boxplot(gro[gro$`%oc.ic.shell` > 0.04,]$`%oc.ic.shell` ~ gro[gro$`%oc.ic.shell` > 0.04,]$sal.treat, ylim = c(-1,3))
 
 summary(lm(gro$gut.wt ~ gro$TA.treat + gro$sal.treat))
 summary(lm(gro$CI ~ gro$TA.treat + gro$sal.treat))
-summary(lm(gro$`%oc.ic.shell` ~ gro$TA.treat + gro$sal.treat))
+summary(lm(gro[gro$`%oc.ic.shell` > 0.04,]$`%oc.ic.shell` ~ gro[gro$`%oc.ic.shell` > 0.04,]$TA.treat + gro[gro$`%oc.ic.shell` > 0.04,]$sal.treat))
 
 pre = gro[gro$Plate == "pre",]
 post = gro[gro$Plate == "post",]
 
 grow = gro[gro$Plate == 1 | gro$Plate == 2 |gro$Plate == 3 | gro$Plate == 4| gro$Plate == 5 |gro$Plate == 6 | gro$Plate == 7| gro$Plate == 8| gro$Plate == 9| gro$Plate == 10| gro$Plate == 11| gro$Plate == 12,]
+grow = grow[grow$`%oc.ic.shell` > 0.04,]
+
+boxplot(grow$gut.wt ~ grow$med.ta)
+boxplot(grow$shell.wt ~ grow$med.ta)
+boxplot(grow$gut.wt ~ grow$sal.treat)
+boxplot(grow$shell.wt ~ grow$sal.treat)
+
+plot(grow$CI ~ grow$med.ta, ylim = c(0.005,0.03), pch = 19, col = as.factor(grow$sal.treat))
+boxplot(grow$CI ~ grow$sal.treat, ylim = c(0,0.03))
+plot(grow$`%oc.ic.shell` ~ grow$med.ta, ylim = c(0,2.5), pch = 19, col = as.factor(grow$sal.treat))
+ave.oc.per = 1.33021
+grow$oc.std = 1.33021 - grow$`%oc.ic.shell`
+plot(grow$oc.std ~ grow$med.ta, pch = 19, col = as.factor(grow$sal.treat), ylim = c(-2,2))
+abline(h=0)
+plot(grow$CI ~ grow$gut.wt, pch = 19, col = as.factor(grow$sal.treat))
+plot(grow$CI ~ grow$gut.wt, pch = 19, col = as.factor(grow$TA.treat))
+plot(grow$CI ~ grow$shell.wt, pch = 19, col = as.factor(grow$sal.treat))
+plot(grow$CI ~ grow$shell.wt, pch = 19, col = as.factor(grow$TA.treat))
+
+boxplot(grow[grow$`%oc.ic.shell` > 0.04,]$`%oc.ic.shell` ~ grow[grow$`%oc.ic.shell` > 0.04,]$sal.treat, ylim = c(-1,3))
 
 plot(pre$gut.wt ~ pre$shell.wt, pch = 19)
 
