@@ -12,6 +12,17 @@ setwd("~/Documents/Data_Git Hub/Mussels/CV_growth/data files")
 library(readxl)
 sw = read_xlsx("treatment monitoring.xlsx")
 gro = read_xlsx("CV mass data.xlsx") 
+gro$bucket = as.numeric(gro$`Bucket#`)
+
+#code scores
+#1 = blank tinfoil measurements
+#2 = no gut but only shell weights
+#3 = ID missing for CV
+#4 = bad data
+gro = gro[gro$code == 0,]
+
+#adding new column for CI
+gro$CI = gro$gut.wt/gro$shell.wt
   
 ```
 
@@ -24,8 +35,10 @@ boxplot(sw[sw$fresh_old == "fresh",]$DO_sat ~ sw[sw$fresh_old == "fresh",]$`Buck
 boxplot(sw[sw$fresh_old == "fresh",]$TA ~ sw[sw$fresh_old == "fresh",]$`Bucket#`)
 boxplot(sw[sw$fresh_old == "fresh",]$TA ~ sw[sw$fresh_old == "fresh",]$TA.treat)
 boxplot(sw[sw$fresh_old == "fresh",]$S ~ sw[sw$fresh_old == "fresh",]$Sal.treat)
-
-#calculating medians
+```
+calculating median values for each bucket
+```{r}
+#calculating medians TA
 b1.ta = median(sw[sw$`Bucket#` == 1,]$TA)
 b2.ta = median(sw[sw$`Bucket#` == 2,]$TA)
 b3.ta = median(sw[sw$`Bucket#` == 3,]$TA)
@@ -41,7 +54,7 @@ b12.ta = median(sw[sw$`Bucket#` == 12,]$TA)
 b13.ta = median(sw[sw$`Bucket#` == 13,]$TA)
 b14.ta = median(sw[sw$`Bucket#` == 14,]$TA)
 
-#adding a column to gro
+#adding a column to gro TA
 gro$med.ta = 0
 gro$med.ta[gro$`Bucket#` == 1] <- b1.ta
 gro$med.ta[gro$`Bucket#` == 2] <- b2.ta
@@ -59,57 +72,133 @@ gro$med.ta[gro$`Bucket#` == 13] <- b13.ta
 gro$med.ta[gro$`Bucket#` == 14] <- b14.ta
 
 
+#calculating medians SAL
+b1.S = median(sw[sw$`Bucket#` == 1,]$S)
+b2.S = median(sw[sw$`Bucket#` == 2,]$S)
+b3.S = median(sw[sw$`Bucket#` == 3,]$S)
+b4.S = median(sw[sw$`Bucket#` == 4,]$S)
+b5.S = median(sw[sw$`Bucket#` == 5,]$S)
+b6.S = median(sw[sw$`Bucket#` == 6,]$S)
+b7.S = median(sw[sw$`Bucket#` == 7,]$S)
+b8.S = median(sw[sw$`Bucket#` == 8,]$S)
+b9.S = median(sw[sw$`Bucket#` == 9,]$S)
+b10.S = median(sw[sw$`Bucket#` == 10,]$S)
+b11.S = median(sw[sw$`Bucket#` ==11,]$S)
+b12.S = median(sw[sw$`Bucket#` == 12,]$S)
+b13.S = median(sw[sw$`Bucket#` == 13,]$S)
+b14.S = median(sw[sw$`Bucket#` == 14,]$S)
+
+#adding a column to gro
+gro$med.S = 0
+gro$med.S[gro$`Bucket#` == 1] <- b1.S
+gro$med.S[gro$`Bucket#` == 2] <- b2.S
+gro$med.S[gro$`Bucket#` == 3] <- b3.S
+gro$med.S[gro$`Bucket#` == 4] <- b4.S
+gro$med.S[gro$`Bucket#` == 5] <- b5.S
+gro$med.S[gro$`Bucket#` == 6] <- b6.S
+gro$med.S[gro$`Bucket#` == 7] <- b7.S
+gro$med.S[gro$`Bucket#` == 8] <- b8.S
+gro$med.S[gro$`Bucket#` == 9] <- b9.S
+gro$med.S[gro$`Bucket#` == 10] <- b10.S
+gro$med.S[gro$`Bucket#` == 11] <- b11.S
+gro$med.S[gro$`Bucket#` == 12] <- b12.S
+gro$med.S[gro$`Bucket#` == 13] <- b13.S
+gro$med.S[gro$`Bucket#` == 14] <- b14.S
+
+#gro + controls
+gro.full = gro
+
+#omitting control oysters
+gro = gro[gro$med.S > 0 & gro$med.ta > 0,]
+
+
+
+
 
 
 ```
 
-looking at growth differences
+looking at final params across axes
 ```{r}
-```
+#gut
+plot(gro$gut.wt ~ gro$med.S)
+plot(gro$gut.wt ~ gro$med.ta)
 
-looking at energy allocation
-```{r}
-gro$CI = gro$gut.wt/gro$shell.wt
+summary(lme(gut.wt ~ med.S + med.ta, random = ~1|bucket, data = gro)) #unclustered data; no effect of S or TA on gut wt
 
-boxplot(gro$gut.wt ~ gro$TA.treat)
 boxplot(gro$gut.wt ~ gro$sal.treat)
-boxplot(gro$shell.wt ~ gro$TA.treat)
-boxplot(gro$shell.wt ~ gro$sal.treat)
-boxplot(gro$CI ~ gro$TA.treat)
+boxplot(gro$gut.wt ~ gro$TA.treat)
+
+summary(aov(gro$gut.wt ~ gro$sal.treat + gro$TA.treat)) #clustering by treatment leads to no effect of S or TA
+
+#shell
+plot(gro$shell.wt ~ gro$med.S)
+plot(gro$shell.wt ~ gro$med.ta)
+
+summary(lme(shell.wt ~ med.S + med.ta, random = ~1|bucket, data = gro)) #unclustered data; no effect of S or TA on shell wt
+
+summary(aov(gro$shell.wt ~ gro$sal.treat + gro$TA.treat)) #clustering by treatment leads to no effect of S or TA
+
+#org
+plot(gro$orgC.shell.wt ~ gro$med.S)
+plot(gro$orgC.shell.wt ~ gro$med.ta)
+
+summary(lme(orgC.shell.wt ~ med.S + med.ta, random = ~1|bucket, data = gro)) #unclustered data; no effect of S and SIG effect of TA on orgC wt in shell
+
+summary(aov(gro$orgC.shell.wt ~ gro$sal.treat + gro$TA.treat)) #clustering by treatment leads to no effect of S and SIG effect of TA on the orgC wt in shell
+
+#org%
+plot(gro$`%oc.ic.shell` ~ gro$med.S)
+plot(gro$`%oc.ic.shell` ~ gro$med.ta)
+
+summary(lme((`%oc.ic.shell`) ~ med.S + med.ta, random = ~1|bucket, data = gro)) #unclustered data; NEED TO FIX CODE
+
+summary(aov(gro$`%oc.ic.shell` ~ gro$sal.treat + gro$TA.treat)) #clustering by treatment leads to no effect of S and SIG effect of TA on the %orgC wt in shell
+
+#CI
+plot(gro$CI ~ gro$med.S)
+plot(gro$CI ~ gro$med.ta)
+
+summary(lme(CI ~ med.S + med.ta, random = ~1|bucket, data = gro)) #unclustered data; NO EFFECT OF EITHER
+
 boxplot(gro$CI ~ gro$sal.treat)
-boxplot(gro[gro$`%oc.ic.shell` > 0.04,]$`%oc.ic.shell` ~ gro[gro$`%oc.ic.shell` > 0.04,]$TA.treat, ylim = c(-1,3))
-boxplot(gro[gro$`%oc.ic.shell` > 0.04,]$`%oc.ic.shell` ~ gro[gro$`%oc.ic.shell` > 0.04,]$sal.treat, ylim = c(-1,3))
+boxplot(gro$CI ~ gro$TA.treat)
 
-summary(lm(gro$gut.wt ~ gro$TA.treat + gro$sal.treat))
-summary(lm(gro$CI ~ gro$TA.treat + gro$sal.treat))
-summary(lm(gro[gro$`%oc.ic.shell` > 0.04,]$`%oc.ic.shell` ~ gro[gro$`%oc.ic.shell` > 0.04,]$TA.treat + gro[gro$`%oc.ic.shell` > 0.04,]$sal.treat))
+summary(aov(gro$CI ~ gro$sal.treat + gro$TA.treat)) #clustering by treatment leads to a SIG effect of S and SIG effect of TA on the condition index (gut.wt/shell.wt)
+library(rstatix)
+aov(gro$CI ~ gro$sal.treat + gro$TA.treat) %>% TukeyHSD() #CI highest in TA 2000 treatment and no diff between 1000 and 3000 treat
 
-pre = gro[gro$Plate == "pre",]
-post = gro[gro$Plate == "post",]
+```
 
-grow = gro[gro$Plate == 1 | gro$Plate == 2 |gro$Plate == 3 | gro$Plate == 4| gro$Plate == 5 |gro$Plate == 6 | gro$Plate == 7| gro$Plate == 8| gro$Plate == 9| gro$Plate == 10| gro$Plate == 11| gro$Plate == 12,]
-grow = grow[grow$`%oc.ic.shell` > 0.04,]
+looking at energy allocation diff from control change
+```{r}
+#pre condition averages
+pre = gro.full[gro.full$Plate == "pre",]
+pre.shell = mean(pre$shell.wt)
+pre.gut = mean(pre$gut.wt)
+pre.CI = mean(pre$CI)
+pre.orgC = mean(pre$orgC.shell.wt)
+pre.percOC = mean(pre$`%oc.ic.shell`)
 
-boxplot(grow$gut.wt ~ grow$med.ta)
-boxplot(grow$shell.wt ~ grow$med.ta)
-boxplot(grow$gut.wt ~ grow$sal.treat)
-boxplot(grow$shell.wt ~ grow$sal.treat)
+#post condition averages
+post = gro.full[gro.full$Plate == "post",]
+post.shell = mean(post$shell.wt)
+post.gut = mean(post$gut.wt)
+post.CI = mean(post$CI)
+post.orgC = mean(post$orgC.shell.wt)
+post.percOC = mean(post$`%oc.ic.shell`)
 
-plot(grow$CI ~ grow$med.ta, ylim = c(0.005,0.03), pch = 19, col = as.factor(grow$sal.treat))
-boxplot(grow$CI ~ grow$sal.treat, ylim = c(0,0.03))
-plot(grow$`%oc.ic.shell` ~ grow$med.ta, ylim = c(0,2.5), pch = 19, col = as.factor(grow$sal.treat))
-ave.oc.per = 1.33021
-grow$oc.std = 1.33021 - grow$`%oc.ic.shell`
-plot(grow$oc.std ~ grow$med.ta, pch = 19, col = as.factor(grow$sal.treat), ylim = c(-2,2))
-abline(h=0)
-plot(grow$CI ~ grow$gut.wt, pch = 19, col = as.factor(grow$sal.treat))
-plot(grow$CI ~ grow$gut.wt, pch = 19, col = as.factor(grow$TA.treat))
-plot(grow$CI ~ grow$shell.wt, pch = 19, col = as.factor(grow$sal.treat))
-plot(grow$CI ~ grow$shell.wt, pch = 19, col = as.factor(grow$TA.treat))
+#difference from beginning
+a = post.percOC - pre.percOC
+b = post.CI - pre.CI
 
-boxplot(grow[grow$`%oc.ic.shell` > 0.04,]$`%oc.ic.shell` ~ grow[grow$`%oc.ic.shell` > 0.04,]$sal.treat, ylim = c(-1,3))
+gro$org.perc.diff = gro$`%oc.ic.shell` - pre.percOC #pos values = higher organic content in shell, neg values = lower organic content in shell
 
-plot(pre$gut.wt ~ pre$shell.wt, pch = 19)
+gro$CI.diff = gro$CI - pre.CI #pos values = higher CI after, neg values = lower CI after
+
+summary(aov(gro$org.perc.diff ~ gro$med.S + gro$med.ta))
+summary(aov(gro$CI.diff ~ gro$med.S + gro$med.ta))
+
 
 
 ```
