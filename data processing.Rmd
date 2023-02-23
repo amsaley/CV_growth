@@ -10,49 +10,56 @@ editor_options:
 #setwd("/Users/alishamsaley/Documents/GitHub/CV_growth/data files")
 setwd("~/Documents/Data_Git Hub/Mussels/CV_growth/data files")
 library(readxl)
+library(lme4)
+library(lm)
 sw = read_xlsx("treatment monitoring.xlsx")
 gro = read_xlsx("CV mass data.xlsx") 
+gro = gro[gro$CV_ID != "bucket 4" & gro$CV_ID != "bucket 6",]
 gro$bucket = as.numeric(gro$`Bucket#`)
+sa = read_xlsx("CV SA practice.xlsx")
+
 
 #code scores
 #1 = blank tinfoil measurements
 #2 = no gut but only shell weights
 #3 = ID missing for CV
 #4 = bad data
-gro = gro[gro$code == 0,]
+#gro = gro[gro$code == 0,]
 
-#adding new column for CI
+#adding new column for CI.gutwt.shellwt
 gro$CI = gro$gut.wt/gro$shell.wt
   
 ```
 
 looking at treatments through time
 ```{r}
+plot(sw$T_c ~ sw$`Bucket#`)
 boxplot(sw[sw$fresh_old == "fresh",]$S ~ sw[sw$fresh_old == "fresh",]$`Bucket#`)
 boxplot(sw$T_c ~ sw$`Bucket#`)
 boxplot(sw[sw$fresh_old == "fresh",]$pH ~ sw[sw$fresh_old == "fresh",]$`Bucket#`)
 boxplot(sw[sw$fresh_old == "fresh",]$DO_sat ~ sw[sw$fresh_old == "fresh",]$`Bucket#`)
 boxplot(sw[sw$fresh_old == "fresh",]$TA ~ sw[sw$fresh_old == "fresh",]$`Bucket#`)
+plot(sw$TA~sw$`Bucket#`)
 boxplot(sw[sw$fresh_old == "fresh",]$TA ~ sw[sw$fresh_old == "fresh",]$TA.treat)
 boxplot(sw[sw$fresh_old == "fresh",]$S ~ sw[sw$fresh_old == "fresh",]$Sal.treat)
 ```
 calculating median values for each bucket
 ```{r}
 #calculating medians TA
-b1.ta = median(sw[sw$`Bucket#` == 1,]$TA)
-b2.ta = median(sw[sw$`Bucket#` == 2,]$TA)
-b3.ta = median(sw[sw$`Bucket#` == 3,]$TA)
-b4.ta = median(sw[sw$`Bucket#` == 4,]$TA)
-b5.ta = median(sw[sw$`Bucket#` == 5,]$TA)
-b6.ta = median(sw[sw$`Bucket#` == 6,]$TA)
-b7.ta = median(sw[sw$`Bucket#` == 7,]$TA)
-b8.ta = median(sw[sw$`Bucket#` == 8,]$TA)
-b9.ta = median(sw[sw$`Bucket#` == 9,]$TA)
-b10.ta = median(sw[sw$`Bucket#` == 10,]$TA)
-b11.ta = median(sw[sw$`Bucket#` ==11,]$TA)
-b12.ta = median(sw[sw$`Bucket#` == 12,]$TA)
-b13.ta = median(sw[sw$`Bucket#` == 13,]$TA)
-b14.ta = median(sw[sw$`Bucket#` == 14,]$TA)
+b1.ta = median(sw[sw$`Bucket#` == 1 & sw$fresh_old == "fresh" ,]$TA)
+b2.ta = median(sw[sw$`Bucket#` == 2& sw$fresh_old == "fresh" ,]$TA)
+b3.ta = median(sw[sw$`Bucket#` == 3& sw$fresh_old == "fresh" ,]$TA)
+b4.ta = median(sw[sw$`Bucket#` == 4& sw$fresh_old == "fresh" ,]$TA)
+b5.ta = median(sw[sw$`Bucket#` == 5& sw$fresh_old == "fresh" ,]$TA)
+b6.ta = median(sw[sw$`Bucket#` == 6 & sw$fresh_old == "fresh" ,]$TA)
+b7.ta = median(sw[sw$`Bucket#` == 7& sw$fresh_old == "fresh" ,]$TA)
+b8.ta = median(sw[sw$`Bucket#` == 8& sw$fresh_old == "fresh" ,]$TA)
+b9.ta = median(sw[sw$`Bucket#` == 9& sw$fresh_old == "fresh" ,]$TA)
+b10.ta = median(sw[sw$`Bucket#` == 10& sw$fresh_old == "fresh" ,]$TA)
+b11.ta = median(sw[sw$`Bucket#` ==11& sw$fresh_old == "fresh" ,]$TA)
+b12.ta = median(sw[sw$`Bucket#` == 12& sw$fresh_old == "fresh" ,]$TA)
+b13.ta = median(sw[sw$`Bucket#` == 13& sw$fresh_old == "fresh" ,]$TA)
+b14.ta = median(sw[sw$`Bucket#` == 14& sw$fresh_old == "fresh" ,]$TA)
 
 #adding a column to gro TA
 gro$med.ta = 0
@@ -111,10 +118,94 @@ gro.full = gro
 #omitting control oysters
 gro = gro[gro$med.S > 0 & gro$med.ta > 0,]
 
+#new df with conditions and SA and weight
+new = cbind(gro,sa)
+#omitting CV that fell off? 
+new = new[new$CV_ID != 146 & 
+            new$CV_ID != 149 &
+            new$CV_ID != 150 & 
+            new$CV_ID != 161 & 
+            new$CV_ID != 174 & 
+            new$CV_ID != 192 & 
+            new$CV_ID != 203 & 
+            new$CV_ID != 205 & 
+            new$CV_ID != 218 & 
+            new$CV_ID != 223 & 
+            new$CV_ID != 241 & 
+            new$CV_ID != 296 & 
+            new$CV_ID != 297 &
+            new$CV_ID != 298 & 
+            new$CV_ID != 300 & 
+            new$CV_ID != 301 & 
+            new$CV_ID != 306 & 
+            new$CV_ID != 311 & 
+            new$CV_ID != 320 &
+            new$CV_ID != 326 & 
+            new$CV_ID != 327 & 
+            new$CV_ID != 329 & 
+            new$CV_ID != 337 & 
+            new$CV_ID != 348 & 
+            new$CV_ID != 360 &
+            new$CV_ID != 367 & 
+            new$CV_ID != 387 & 
+            new$CV_ID != 388 &
+            new$CV_ID != 403 &
+            new$CV_ID != 409 &
+            new$CV_ID != 419 & 
+            new$CV_ID != 437 & 
+            new$CV_ID != 442 &
+            new$CV_ID != 464 & 
+            new$CV_ID != 465 & 
+            new$CV_ID != 466 & 
+            new$CV_ID != 468 & 
+            new$CV_ID != 470 & 
+            new$CV_ID != 472 &
+            new$CV_ID != 473 &
+            new$CV_ID != 479 & 
+            new$CV_ID != 482 & 
+            new$CV_ID != 485 & 
+            new$CV_ID != 491 & 
+            new$CV_ID != 517 & 
+            new$CV_ID != 541 &
+            new$CV_ID != 542 & 
+            new$CV_ID != 544 & 
+            new$CV_ID != 549 & 
+            new$CV_ID != 561 & 
+            new$CV_ID != 564 &
+            new$CV_ID != 566 & 
+            new$CV_ID != 567 & 
+            new$CV_ID != 570 & 
+            new$CV_ID != 571 & 
+            new$CV_ID != 577 &
+            new$CV_ID != 578 & 
+            new$CV_ID != 581,]
+
+plot(new$diff.perc, pch = 19, col = "white")
+points(new$mid.diff.perc, pch = 19, col = "blue")
+points(new$mid.end.perc, pch = 19, col = "dark green")
+
+new$delta.rates = new$mid.end.perc - new$mid.diff.perc
+
+boxplot(new$delta.rates ~ new$sal.treat + new$TA.treat, pch = 19)
+
+plot(new$diff.perc ~ new$mid.diff.perc, pch = 19)
+abline(0,1)
+
+plot(new$diff.perc ~ new$med.ta, col = as.factor(new$sal.treat), pch = 19)
+new = new[new$code == 0,]
+
+plot(new$shell.wt ~ new$end, pch = 19, col = as.factor(new$sal.treat))
+plot(new$orgC.shell.wt ~ new$med.ta, pch = 19, col = as.factor(new$TA.treat))
+boxplot(new$`%oc.ic.shell`~new$TA.treat + new$sal.treat, pch = 19, col = as.factor(new$TA.treat))
+plot(new$`%oc.ic.shell`~new$diff, pch = 19, col = as.factor(new$TA.treat))
 
 
+summary(lme(`%oc.ic.shell`~ med.ta + med.S, data = gro, random = ~1|bucket))
 
 
+plot(new$mid.diff.perc ~ jitter(new$med.ta,100), pch = 19, col = as.factor(new$sal.treat))
+plot(new$mid.end.perc ~ jitter(new$med.ta,100), pch = 19, col = as.factor(new$sal.treat))
+plot(new$delta.rates ~ jitter(new$med.ta,100), pch = 19, col = as.factor(new$sal.treat))
 
 ```
 
@@ -131,7 +222,7 @@ boxplot(gro$gut.wt ~ gro$TA.treat)
 
 summary(aov(gro$gut.wt ~ gro$sal.treat + gro$TA.treat)) #clustering by treatment leads to no effect of S or TA
 
-#shell
+#shell weight
 plot(gro$shell.wt ~ gro$med.S)
 plot(gro$shell.wt ~ gro$med.ta)
 
@@ -139,7 +230,7 @@ summary(lme(shell.wt ~ med.S + med.ta, random = ~1|bucket, data = gro)) #unclust
 
 summary(aov(gro$shell.wt ~ gro$sal.treat + gro$TA.treat)) #clustering by treatment leads to no effect of S or TA
 
-#org
+#organic mass
 plot(gro$orgC.shell.wt ~ gro$med.S)
 plot(gro$orgC.shell.wt ~ gro$med.ta)
 
@@ -147,7 +238,7 @@ summary(lme(orgC.shell.wt ~ med.S + med.ta, random = ~1|bucket, data = gro)) #un
 
 summary(aov(gro$orgC.shell.wt ~ gro$sal.treat + gro$TA.treat)) #clustering by treatment leads to no effect of S and SIG effect of TA on the orgC wt in shell
 
-#org%
+#org carbon as % total wt
 plot(gro$`%oc.ic.shell` ~ gro$med.S)
 plot(gro$`%oc.ic.shell` ~ gro$med.ta)
 
@@ -167,6 +258,35 @@ boxplot(gro$CI ~ gro$TA.treat)
 summary(aov(gro$CI ~ gro$sal.treat + gro$TA.treat)) #clustering by treatment leads to a SIG effect of S and SIG effect of TA on the condition index (gut.wt/shell.wt)
 library(rstatix)
 aov(gro$CI ~ gro$sal.treat + gro$TA.treat) %>% TukeyHSD() #CI highest in TA 2000 treatment and no diff between 1000 and 3000 treat
+
+
+#gut wt to shell wt ratio
+
+#shell SA to shell wt ratio
+
+#first 2 weeks of acclimating: growth rate
+plot(new$mid.diff.perc, pch = 19) 
+boxplot(new$mid.diff.perc ~ new$TA.treat + new$sal.treat, ylab = "growth rate for first two weeks") 
+abline(h=0)# values above 0 mean that oysters had net growth
+
+
+#second 2 weeks post acclimating: growth rate
+plot(new$mid.end.perc, pch = 19) 
+boxplot(new$mid.end.perc ~ new$TA.treat + new$sal.treat, ylab = "growth rate for second two weeks") 
+abline(h=0)# values above 0 mean oysters had net growth
+
+
+#full experiment growth rate
+plot(new$diff.perc, pch = 19) 
+boxplot(as.numeric(new$diff.perc) ~ new$TA.treat + new$sal.treat, ylab = "growth rate over duration of experiment") 
+abline(h=0)# values above 0 mean that oysters had new growth
+
+#difference in growth rate from acclim to post acclim
+plot(new$delta.rates, pch = 19) 
+abline(h=0)# values above 0 mean that growth rate increased after acclim and anything less than 0 means that growth rate was higher during acclimation
+boxplot(new$delta.rates ~ new$TA.treat + new$sal.treat, pch = 19, ylab = "change in growth rate after acclimation") 
+abline(h=0)# values above 0 mean that growth rate increased after acclim and anything less than 0 means that growth rate was higher during acclimation
+plot(new$delta.rates ~ new$med.ta, pch = 19, col = as.factor(new$sal.treat))
 
 ```
 
