@@ -5,194 +5,1527 @@ date: '2022-10-25'
 editor_options: 
   chunk_output_type: console
 ---
-
+loading library and import data
 ```{r}
-#setwd("/Users/alishamsaley/Documents/GitHub/CV_growth/data files")
-setwd("~/Documents/Data_Git Hub/Mussels/CV_growth/data files")
+setwd("C:/Users/alish/OneDrive/Documents/GitHub/CV_growth/data files")
 library(readxl)
 library(lme4)
-library(lm)
+library(lmerTest)
 sw = read_xlsx("treatment monitoring.xlsx")
-gro = read_xlsx("CV mass data.xlsx") 
-gro = gro[gro$CV_ID != "bucket 4" & gro$CV_ID != "bucket 6",]
-gro$bucket = as.numeric(gro$`Bucket#`)
-sa = read_xlsx("CV SA practice.xlsx")
+mass = read_xlsx("CV mass data.xlsx") 
+  mass = mass[mass$CV_ID != "bucket 4" & mass$CV_ID != "bucket 6",]
+  mass$CI = mass$gut.wt/mass$shell.wt
+  mass$bucket = as.numeric(mass$`Bucket#`)
+  #code scores
+  #1 = blank tinfoil measurements
+  #2 = no gut but only shell weights
+  #3 = ID missing for CV
+  #4 = bad data
+  mass = mass[mass$code == 0,]
+sa = read_xlsx("all SA growth data.xlsx")
 
-
-#code scores
-#1 = blank tinfoil measurements
-#2 = no gut but only shell weights
-#3 = ID missing for CV
-#4 = bad data
-#gro = gro[gro$code == 0,]
-
-#adding new column for CI.gutwt.shellwt
-gro$CI = gro$gut.wt/gro$shell.wt
   
 ```
-
-looking at treatments through time
+seacarb for carbonate system estimates; need to get data from other computer*
 ```{r}
-plot(sw$T_c ~ sw$`Bucket#`)
-boxplot(sw[sw$fresh_old == "fresh",]$S ~ sw[sw$fresh_old == "fresh",]$`Bucket#`)
-boxplot(sw$T_c ~ sw$`Bucket#`)
-boxplot(sw[sw$fresh_old == "fresh",]$pH ~ sw[sw$fresh_old == "fresh",]$`Bucket#`)
-boxplot(sw[sw$fresh_old == "fresh",]$DO_sat ~ sw[sw$fresh_old == "fresh",]$`Bucket#`)
-boxplot(sw[sw$fresh_old == "fresh",]$TA ~ sw[sw$fresh_old == "fresh",]$`Bucket#`)
-plot(sw$TA~sw$`Bucket#`)
-boxplot(sw[sw$fresh_old == "fresh",]$TA ~ sw[sw$fresh_old == "fresh",]$TA.treat)
-boxplot(sw[sw$fresh_old == "fresh",]$S ~ sw[sw$fresh_old == "fresh",]$Sal.treat)
+
 ```
-calculating median values for each bucket
+calculating median values for sw treatments to apply to the plates (pH, TA, and S); mass.full saved as df
 ```{r}
-#calculating medians TA
-b1.ta = median(sw[sw$`Bucket#` == 1 & sw$fresh_old == "fresh" ,]$TA)
-b2.ta = median(sw[sw$`Bucket#` == 2& sw$fresh_old == "fresh" ,]$TA)
-b3.ta = median(sw[sw$`Bucket#` == 3& sw$fresh_old == "fresh" ,]$TA)
-b4.ta = median(sw[sw$`Bucket#` == 4& sw$fresh_old == "fresh" ,]$TA)
-b5.ta = median(sw[sw$`Bucket#` == 5& sw$fresh_old == "fresh" ,]$TA)
-b6.ta = median(sw[sw$`Bucket#` == 6 & sw$fresh_old == "fresh" ,]$TA)
-b7.ta = median(sw[sw$`Bucket#` == 7& sw$fresh_old == "fresh" ,]$TA)
-b8.ta = median(sw[sw$`Bucket#` == 8& sw$fresh_old == "fresh" ,]$TA)
-b9.ta = median(sw[sw$`Bucket#` == 9& sw$fresh_old == "fresh" ,]$TA)
-b10.ta = median(sw[sw$`Bucket#` == 10& sw$fresh_old == "fresh" ,]$TA)
-b11.ta = median(sw[sw$`Bucket#` ==11& sw$fresh_old == "fresh" ,]$TA)
-b12.ta = median(sw[sw$`Bucket#` == 12& sw$fresh_old == "fresh" ,]$TA)
-b13.ta = median(sw[sw$`Bucket#` == 13& sw$fresh_old == "fresh" ,]$TA)
-b14.ta = median(sw[sw$`Bucket#` == 14& sw$fresh_old == "fresh" ,]$TA)
-
 #adding a column to gro TA
-gro$med.ta = 0
-gro$med.ta[gro$`Bucket#` == 1] <- b1.ta
-gro$med.ta[gro$`Bucket#` == 2] <- b2.ta
-gro$med.ta[gro$`Bucket#` == 3] <- b3.ta
-gro$med.ta[gro$`Bucket#` == 4] <- b4.ta
-gro$med.ta[gro$`Bucket#` == 5] <- b5.ta
-gro$med.ta[gro$`Bucket#` == 6] <- b6.ta
-gro$med.ta[gro$`Bucket#` == 7] <- b7.ta
-gro$med.ta[gro$`Bucket#` == 8] <- b8.ta
-gro$med.ta[gro$`Bucket#` == 9] <- b9.ta
-gro$med.ta[gro$`Bucket#` == 10] <- b10.ta
-gro$med.ta[gro$`Bucket#` == 11] <- b11.ta
-gro$med.ta[gro$`Bucket#` == 12] <- b12.ta
-gro$med.ta[gro$`Bucket#` == 13] <- b13.ta
-gro$med.ta[gro$`Bucket#` == 14] <- b14.ta
+mass$med.ta = 0
+mass$med.ta[mass$`Bucket#` == 1] <- median(sw[sw$`Bucket#` == 1& sw$fresh_old == "fresh",]$TA)
+mass$med.ta[mass$`Bucket#` == 2] <- median(sw[sw$`Bucket#` == 2& sw$fresh_old == "fresh",]$TA)
+mass$med.ta[mass$`Bucket#` == 3] <- median(sw[sw$`Bucket#` == 3& sw$fresh_old == "fresh",]$TA)
+mass$med.ta[mass$`Bucket#` == 4] <- median(sw[sw$`Bucket#` == 4& sw$fresh_old == "fresh",]$TA)
+mass$med.ta[mass$`Bucket#` == 5] <- median(sw[sw$`Bucket#` == 5& sw$fresh_old == "fresh",]$TA)
+mass$med.ta[mass$`Bucket#` == 6] <- median(sw[sw$`Bucket#` == 6& sw$fresh_old == "fresh",]$TA)
+mass$med.ta[mass$`Bucket#` == 7] <- median(sw[sw$`Bucket#` == 7& sw$fresh_old == "fresh",]$TA)
+mass$med.ta[mass$`Bucket#` == 8] <- median(sw[sw$`Bucket#` == 8& sw$fresh_old == "fresh",]$TA)
+mass$med.ta[mass$`Bucket#` == 9] <- median(sw[sw$`Bucket#` == 9& sw$fresh_old == "fresh",]$TA)
+mass$med.ta[mass$`Bucket#` == 10] <- median(sw[sw$`Bucket#` == 10& sw$fresh_old == "fresh",]$TA)
+mass$med.ta[mass$`Bucket#` == 11] <- median(sw[sw$`Bucket#` == 11& sw$fresh_old == "fresh",]$TA)
+mass$med.ta[mass$`Bucket#` == 12] <- median(sw[sw$`Bucket#` == 12& sw$fresh_old == "fresh",]$TA)
+mass$med.ta[mass$`Bucket#` == 13] <- median(sw[sw$`Bucket#` == 13& sw$fresh_old == "fresh",]$TA)
+mass$med.ta[mass$`Bucket#` == 14] <- median(sw[sw$`Bucket#` == 14& sw$fresh_old == "fresh",]$TA)
+#adding a column to gro S
+mass$med.S = 0
+mass$med.S[mass$`Bucket#` == 1] <- median(sw[sw$`Bucket#` == 1,]$S)
+mass$med.S[mass$`Bucket#` == 2] <- median(sw[sw$`Bucket#` == 2,]$S)
+mass$med.S[mass$`Bucket#` == 3] <- median(sw[sw$`Bucket#` == 3,]$S)
+mass$med.S[mass$`Bucket#` == 4] <- median(sw[sw$`Bucket#` == 4,]$S)
+mass$med.S[mass$`Bucket#` == 5] <- median(sw[sw$`Bucket#` == 5,]$S)
+mass$med.S[mass$`Bucket#` == 6] <- median(sw[sw$`Bucket#` == 6,]$S)
+mass$med.S[mass$`Bucket#` == 7] <- median(sw[sw$`Bucket#` == 7,]$S)
+mass$med.S[mass$`Bucket#` == 8] <- median(sw[sw$`Bucket#` == 8,]$S)
+mass$med.S[mass$`Bucket#` == 9] <- median(sw[sw$`Bucket#` == 9,]$S)
+mass$med.S[mass$`Bucket#` == 10] <- median(sw[sw$`Bucket#` == 10,]$S)
+mass$med.S[mass$`Bucket#` == 11] <- median(sw[sw$`Bucket#` == 11,]$S)
+mass$med.S[mass$`Bucket#` == 12] <- median(sw[sw$`Bucket#` == 12,]$S)
+mass$med.S[mass$`Bucket#` == 13] <- median(sw[sw$`Bucket#` == 13,]$S)
+mass$med.S[mass$`Bucket#` == 14] <- median(sw[sw$`Bucket#` == 14,]$S)
+#adding a column to gro pH (need to correct value still)
+mass$med.pH = 0
+mass$med.pH[mass$`Bucket#` == 1] <- median(sw[sw$`Bucket#` == 1 & sw$fresh_old == "fresh",]$pH)
+mass$med.pH[mass$`Bucket#` == 2] <- median(sw[sw$`Bucket#` == 2 & sw$fresh_old == "fresh",]$pH)
+mass$med.pH[mass$`Bucket#` == 3] <- median(sw[sw$`Bucket#` == 3 & sw$fresh_old == "fresh",]$pH)
+mass$med.pH[mass$`Bucket#` == 4] <- median(sw[sw$`Bucket#` == 4 & sw$fresh_old == "fresh",]$pH)
+mass$med.pH[mass$`Bucket#` == 5] <- median(sw[sw$`Bucket#` == 5 & sw$fresh_old == "fresh",]$pH)
+mass$med.pH[mass$`Bucket#` == 6] <- median(sw[sw$`Bucket#` == 6 & sw$fresh_old == "fresh",]$pH)
+mass$med.pH[mass$`Bucket#` == 7] <- median(sw[sw$`Bucket#` == 7 & sw$fresh_old == "fresh",]$pH)
+mass$med.pH[mass$`Bucket#` == 8] <- median(sw[sw$`Bucket#` == 8 & sw$fresh_old == "fresh",]$pH)
+mass$med.pH[mass$`Bucket#` == 9] <- median(sw[sw$`Bucket#` == 9 & sw$fresh_old == "fresh",]$pH)
+mass$med.pH[mass$`Bucket#` == 10] <- median(sw[sw$`Bucket#` == 10 & sw$fresh_old == "fresh",]$pH)
+mass$med.pH[mass$`Bucket#` == 11] <- median(sw[sw$`Bucket#` == 11 & sw$fresh_old == "fresh",]$pH)
+mass$med.pH[mass$`Bucket#` == 12] <- median(sw[sw$`Bucket#` == 12 & sw$fresh_old == "fresh",]$pH)
+mass$med.pH[mass$`Bucket#` == 13] <- median(sw[sw$`Bucket#` == 13 & sw$fresh_old == "fresh",]$pH)
+mass$med.pH[mass$`Bucket#` == 14] <- median(sw[sw$`Bucket#` == 14 & sw$fresh_old == "fresh",]$pH)
+mass.full = mass
+
+```
+omitting control points from mass data; omitting CV_ID that fell off/died during trial; saved as mass and sa.proc
+```{r}
+#omitting controls
+mass = mass[mass$med.S > 0 & mass$med.ta > 0,]
+#omitting CV ids that fell off during trial
+sa.proc = subset(sa, sa$CV_ID != 581 &
+                   sa$CV_ID != 578 & 
+                   sa$CV_ID != 577 & 
+                   sa$CV_ID != 571 &             
+                   sa$CV_ID != 570 &
+                   sa$CV_ID != 567 & 
+                   sa$CV_ID != 566 & 
+                   sa$CV_ID != 564 & 
+                   sa$CV_ID != 561 & 
+                   sa$CV_ID != 549 & 
+                   sa$CV_ID != 544 & 
+                   sa$CV_ID != 541 &
+                   sa$CV_ID != 537 & 
+                   sa$CV_ID != 530 & 
+                   sa$CV_ID != 517 & 
+                   sa$CV_ID != 514 & 
+                   sa$CV_ID != 491 & 
+                   sa$CV_ID != 482 &
+                   sa$CV_ID != 479 & 
+                   sa$CV_ID != 472 & 
+                   sa$CV_ID != 470 & 
+                   sa$CV_ID != 465 & 
+                   sa$CV_ID != 464 &
+                   sa$CV_ID != 462 & 
+                   sa$CV_ID != 459 &
+                   sa$CV_ID != 442 & 
+                   sa$CV_ID != 437 & 
+                   sa$CV_ID != 419 & 
+                   sa$CV_ID != 409 & 
+                   sa$CV_ID != 405 & 
+                   sa$CV_ID != 403 &
+                   sa$CV_ID != 367 & 
+                   sa$CV_ID != 360 & 
+                   sa$CV_ID != 348 &
+                   sa$CV_ID != 337 &
+                   sa$CV_ID != 334 &
+                   sa$CV_ID != 332 & 
+                   sa$CV_ID != 329 & 
+                   sa$CV_ID != 326 &
+                   sa$CV_ID != 321 &
+                   sa$CV_ID != 317 & 
+                   sa$CV_ID != 313 & 
+                   sa$CV_ID != 311 & 
+                   sa$CV_ID != 306 &
+                   sa$CV_ID != 305 & 
+                   sa$CV_ID != 301 & 
+                   sa$CV_ID != 300 & 
+                   sa$CV_ID != 299 &
+                   sa$CV_ID != 298 &
+                   sa$CV_ID != 297 & 
+                   sa$CV_ID != 296 &
+                   sa$CV_ID != 271 & 
+                   sa$CV_ID != 241 & 
+                   sa$CV_ID != 223 & 
+                   sa$CV_ID != 218 & 
+                   sa$CV_ID != 205 &
+                   sa$CV_ID != 203 &
+                   sa$CV_ID != 192 & 
+                   sa$CV_ID != 161& 
+                   sa$CV_ID != 150 & 
+                   sa$CV_ID != 149 & 
+                   sa$CV_ID != 146 &
+                   sa$CV_ID != 131 & 
+                   sa$CV_ID != 114 &
+                   sa$CV_ID != 91 & 
+                   sa$CV_ID != 78 & 
+                   sa$CV_ID != 54 & 
+                   sa$CV_ID != 42 &
+                   sa$CV_ID != 29 & 
+                   sa$CV_ID != 13 &
+                   sa$CV_ID != 7 & 
+                   sa$CV_ID != 6)
+```
+calculating growth rate from time step to time step; new df as growth_rate from sa.proc
+```{r}
+library(dplyr)
+
+growth_rate = sa.proc %>%
+  # first sort by year
+  group_by(CV_ID) %>%
+  mutate(Diff_time = date.numb - lag(date.numb),  # Difference in time (just in case there are gaps)
+         Diff_growth = SA.mm2 - lag(SA.mm2), # Difference in route between years
+         Rate_percent = (Diff_growth / Diff_time)/SA.mm2 * 100)# growth rate in percent 
+```
+merging the growth + treatments + mass into one data frame; new df to use from here = dat
+```{r}
+full = merge(growth_rate, mass, by = "CV_ID")
+full = full[,-c(9,17:20,24)] #removing the redundant columns
+#dat = full[full$TA.treat.x == "1000" | full$TA.treat.x == "3000",]
+dat = full
+```
+look at the dat data and correcting for outliers? 
+```{r}
+plot(dat$grow.ratio ~ dat$SA.start, pch = 19)
+summary(dat$grow.ratio)
+q1 = 1.0
+q3 = 1.1298
+iqr = q3-q1
+max = q3 + (1.5*iqr)
+min = 0.01
+plot(dat$grow.ratio, pch = 19)
+abline(h=c(min,max))
+
+#dat = dat[dat$grow.ratio < max & dat$grow.ratio > min,]
+dat = dat[dat$grow.ratio < 1.5,]
+
+```
+
+creating new columns for grouping by time, and treatment combo...also creating new subsetting df for each time stamp we are interested in
+```{r}
+dat$size = NA
+dat[dat$SA.start < 100,]$size <- "small"
+dat[dat$SA.start > 200,]$size <- "large"
+dat[dat$SA.start > 100 & dat$SA.start < 200,]$size <- "medium"
+dat$group = 0
+dat[dat$TA.treat.x == 1000 & dat$sal.treat.x == "low",]$group <- "low.1"
+dat[dat$TA.treat.x == 3000 & dat$sal.treat.x == "low",]$group <- "low.3"
+dat[dat$TA.treat.x == 1000 & dat$sal.treat.x == "amb",]$group <- "amb.1"
+dat[dat$TA.treat.x == 3000 & dat$sal.treat.x == "amb",]$group <- "amb.3"
+dat[dat$TA.treat.x == 2000 & dat$sal.treat.x == "low",]$group <- "low.2"
+dat[dat$TA.treat.x == 2000 & dat$sal.treat.x == "amb",]$group <- "amb.2"
+#subsetting data into specific time points
+dat$dps.chr = "all"
+  dat[dat$dps == 0,]$dps.chr <- "start"
+  dat[dat$dps == 7,]$dps.chr <- "mid"
+  dat[dat$dps == 15,]$dps.chr <- "mid2"
+  dat[dat$dps == 29,]$dps.chr <- "mid3"
+  dat[dat$dps == 36,]$dps.chr <- "end"
+start = dat[dat$dps == 0,]
+mid = dat[dat$dps == 7,]
+mid2 = dat[dat$dps == 15,]
+mid3 = dat[dat$dps == 29,]
+end = dat[dat$dps == 36,]
+#subsetting data into high S or low S
+high.s = dat[dat$sal.treat.x == "amb",]
+low.s = dat[dat$sal.treat.x == "low",]
+```
+DATA TREATMENT VISUALIZATION
+```{r}
+par(mfrow = c(1,1))
+sw = sw[sw$TA.treat != "amb",]
+#TA vs target; sal as color
+plot(sw$TA ~ sw$TA.treat, pch = 19, col = as.factor(sw$Sal.treat), xlab = "TA treatment", ylab = "Measured TA")
+#pH vs TA; sal as color
+plot(sw$pH ~ sw$TA, pch = 19, col = as.factor(sw$Sal.treat), xlab = "TA measured", ylab = "pH TA") #pH is decoupled from TA at low TA treatments across both salinities, however, at TA > 2000, pH does not vary across the two S treatments
+```
+GROWTH RATE VISUALIZATION; as distributions binned by TA OR S lumped and then parsed into 3 size classes (based on percentiles from full dataset)
+```{r}
+#looking at distribution of growth based on treatments...
+  # Combined histograms
+  red <- rgb (1, 0, 0, alpha=0.5) 
+  green <- rgb (1, 1, 0, alpha=0.5)
+  blue <- rgb (0, 0, 1, alpha=0.5)
+#all sizes lumped together
+hist(mid[mid$TA.treat.x == 2000,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "7 dps", main = "all sizes")
+    hist(mid[mid$TA.treat.x == 1000,]$grow.ratio, add=T, col=green,probability=T)
+    hist(mid[mid$TA.treat.x == 3000,]$grow.ratio, add=T, col=blue,probability=T)
+    #now as a violin plot? 
+    library(vioplot)
+    vioplot(mid$grow.ratio ~ mid$TA.treat.x + mid$sal.treat.x + mid$size,
+        col = "white",               # Color of the area
+        rectCol = as.factor(mid$size),       # Color of the rectangle
+        lineCol = "black",     # Color of the line
+        colMed = "green",      # Pch symbol color
+        border = "black",      # Color of the border of the violin
+        pchMed = 16,           # Pch symbol for the median
+        method = "jitter",
+        plotCentre = "points") # If "line", plots a median line
+    
+#small individuals (<100mm2 start SA)
+    hist(mid[mid$TA.treat.x == 2000& mid$SA.start < 100,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "7 dps", main = "small < 100 mm2 start")
+    hist(mid[mid$TA.treat.x == 1000& mid$SA.start < 100,]$grow.ratio, add=T, col=green,probability=T)
+    hist(mid[mid$TA.treat.x == 3000& mid$SA.start < 100,]$grow.ratio, add=T, col=blue,probability=T)
+    
+    hist(mid2[mid2$TA.treat.x == 2000& mid2$SA.start < 100,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "15 dps", main = "small < 100 mm2 start")
+    hist(mid2[mid2$TA.treat.x == 1000& mid2$SA.start < 100,]$grow.ratio, add=T, col=green,probability=T)
+    hist(mid2[mid2$TA.treat.x == 3000& mid2$SA.start < 100,]$grow.ratio, add=T, col=blue,probability=T)    
+    
+    hist(mid3[mid3$TA.treat.x == 2000& mid3$SA.start < 100,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "29 dps", main = "small < 100 mm2 start")
+    hist(mid3[mid3$TA.treat.x == 1000& mid3$SA.start < 100,]$grow.ratio, add=T, col=green,probability=T)
+    hist(mid3[mid3$TA.treat.x == 3000& mid3$SA.start < 100,]$grow.ratio, add=T, col=blue,probability=T)    
+    
+    hist(end[end$TA.treat.x == 2000& end$SA.start < 100,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "36 dps", main = "small < 100 mm2 start")
+    hist(end[end$TA.treat.x == 1000& end$SA.start < 100,]$grow.ratio, add=T, col=green,probability=T)
+    hist(end[end$TA.treat.x == 3000& end$SA.start < 100,]$grow.ratio, add=T, col=blue,probability=T)    
+    
+#large individuals (>200mm2 start SA)
+    hist(mid[mid$TA.treat.x == 2000& mid$SA.start > 200,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "7 dps", main = "large > 200 mm2 start")
+    hist(mid[mid$TA.treat.x == 1000& mid$SA.start > 200,]$grow.ratio, add=T, col=green,probability=T)
+    hist(mid[mid$TA.treat.x == 3000& mid$SA.start > 200,]$grow.ratio, add=T, col=blue,probability=T)
+    
+    hist(mid2[mid2$TA.treat.x == 2000& mid2$SA.start > 200,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "15 dps", main = "large > 200 mm2 start")
+    hist(mid2[mid2$TA.treat.x == 1000& mid2$SA.start > 200,]$grow.ratio, add=T, col=green,probability=T)
+    hist(mid2[mid2$TA.treat.x == 3000& mid2$SA.start > 200,]$grow.ratio, add=T, col=blue,probability=T)    
+    
+    hist(mid3[mid3$TA.treat.x == 2000& mid3$SA.start > 200,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "29 dps", main = "large > 200 mm2 start")
+    hist(mid3[mid3$TA.treat.x == 1000& mid3$SA.start > 200,]$grow.ratio, add=T, col=green,probability=T)
+    hist(mid3[mid3$TA.treat.x == 3000& mid3$SA.start > 200,]$grow.ratio, add=T, col=blue,probability=T)    
+    
+    hist(end[end$TA.treat.x == 2000& end$SA.start > 200,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "36 dps", main = "large > 200 mm2 start")
+    hist(end[end$TA.treat.x == 1000& end$SA.start > 200,]$grow.ratio, add=T, col=green,probability=T)
+    hist(end[end$TA.treat.x == 3000& end$SA.start > 200,]$grow.ratio, add=T, col=blue,probability=T)    
+    
+#medium individuals (>200mm2 start SA)
+    hist(mid[mid$TA.treat.x == 2000& mid$SA.start > 100 & mid$SA.start < 200,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,12), col=red,probability=T, xlab = "7 dps", main = "medium 101-199 mm2 start")
+    hist(mid[mid$TA.treat.x == 1000& mid$SA.start > 100 & mid$SA.start < 200,]$grow.ratio, add=T, col=green,probability=T)
+    hist(mid[mid$TA.treat.x == 3000& mid$SA.start > 100 & mid$SA.start < 200,]$grow.ratio, add=T, col=blue,probability=T)
+    
+    hist(mid2[mid2$TA.treat.x == 2000& mid2$SA.start > 100 & mid2$SA.start < 200,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,12), col=red,probability=T, xlab = "15 dps", main = "medium 101-199 mm2 start")
+    hist(mid2[mid2$TA.treat.x == 1000& mid2$SA.start > 100 & mid2$SA.start < 200,]$grow.ratio, add=T, col=green,probability=T)
+    hist(mid2[mid2$TA.treat.x == 3000& mid2$SA.start > 100 & mid2$SA.start < 200,]$grow.ratio, add=T, col=blue,probability=T)    
+    
+    hist(mid3[mid3$TA.treat.x == 2000& mid3$SA.start > 100 & mid3$SA.start < 200,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,12), col=red,probability=T, xlab = "29 dps", main = "medium 101-199 mm2 start")
+    hist(mid3[mid3$TA.treat.x == 1000& mid3$SA.start > 100 & mid3$SA.start < 200,]$grow.ratio, add=T, col=green,probability=T)
+    hist(mid3[mid3$TA.treat.x == 3000& mid3$SA.start > 100 & mid3$SA.start < 200,]$grow.ratio, add=T, col=blue,probability=T)    
+    
+    hist(end[end$TA.treat.x == 2000& end$SA.start > 100 & end$SA.start < 200,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,12), col=red,probability=T, xlab = "36 dps", main = "medium 101-199 mm2 start")
+    hist(end[end$TA.treat.x == 1000& end$SA.start > 100 & end$SA.start < 200,]$grow.ratio, add=T, col=green,probability=T)
+    hist(end[end$TA.treat.x == 3000& end$SA.start > 100 & end$SA.start < 200,]$grow.ratio, add=T, col=blue,probability=T)    
+    
+#COLORED BY SALINITY TREATMENT
+#all sizes lumped together
+    hist(mid[mid$sal.treat.x == "amb",]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "7 dps", main = "all sizes")
+    hist(mid[mid$sal.treat.x == "low",]$grow.ratio, add=T, col=green,probability=T)
+    
+    hist(mid2[mid2$sal.treat.x == "amb",]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "15 dps", main = NA)
+    hist(mid2[mid2$sal.treat.x == "low",]$grow.ratio, add=T, col=green,probability=T)
+    
+    hist(mid3[mid3$sal.treat.x == "amb",]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "29 dps", main = NA)
+    hist(mid3[mid3$sal.treat.x == "low",]$grow.ratio, add=T, col=green,probability=T)
+    
+    hist(end[end$sal.treat.x == "amb",]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "36 dps", main = NA)
+    hist(end[end$sal.treat.x == "low",]$grow.ratio, add=T, col=green,probability=T)
+
+#small sizes lumped together
+    hist(mid[mid$sal.treat.x == "amb"& mid$SA.start < 100,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "7 dps", main = "SMALL sizes")
+    hist(mid[mid$sal.treat.x == "low"& mid$SA.start < 100,]$grow.ratio, add=T, col=green,probability=T)
+    
+    hist(mid2[mid2$sal.treat.x == "amb"& mid2$SA.start < 100,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "15 dps", main = NA)
+    hist(mid2[mid2$sal.treat.x == "low"& mid2$SA.start < 100,]$grow.ratio, add=T, col=green,probability=T)
+    
+    hist(mid3[mid3$sal.treat.x == "amb"& mid3$SA.start < 100,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "29 dps", main = NA)
+    hist(mid3[mid3$sal.treat.x == "low"& mid3$SA.start < 100,]$grow.ratio, add=T, col=green,probability=T)
+    
+    hist(end[end$sal.treat.x == "amb"& end$SA.start < 100,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "36 dps", main = NA)
+    hist(end[end$sal.treat.x == "low"& end$SA.start < 100,]$grow.ratio, add=T, col=green,probability=T)
+#large sizes lumped together
+    hist(mid[mid$sal.treat.x == "amb"& mid$SA.start > 200,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "7 dps", main = "LARGE sizes")
+    hist(mid[mid$sal.treat.x == "low"& mid$SA.start > 200,]$grow.ratio, add=T, col=green,probability=T)
+    
+    hist(mid2[mid2$sal.treat.x == "amb"& mid2$SA.start > 200,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "15 dps", main = NA)
+    hist(mid2[mid2$sal.treat.x == "low"& mid2$SA.start > 200,]$grow.ratio, add=T, col=green,probability=T)
+    
+    hist(mid3[mid3$sal.treat.x == "amb"& mid3$SA.start > 200,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "29 dps", main = NA)
+    hist(mid3[mid3$sal.treat.x == "low"& mid3$SA.start > 200,]$grow.ratio, add=T, col=green,probability=T)
+    
+    hist(end[end$sal.treat.x == "amb"& end$SA.start > 200,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "36 dps", main = NA)
+    hist(end[end$sal.treat.x == "low"& end$SA.start > 200,]$grow.ratio, add=T, col=green,probability=T)
+#medium sizes lumped together
+    hist(mid[mid$sal.treat.x == "amb"& mid$SA.start > 100 & mid$SA.start < 200,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "7 dps", main = "med sizes")
+    hist(mid[mid$sal.treat.x == "low"& mid$SA.start > 100 & mid$SA.start < 200,]$grow.ratio, add=T, col=green,probability=T)
+    
+    hist(mid2[mid2$sal.treat.x == "amb"& mid2$SA.start > 100 & mid2$SA.start < 200,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "15 dps", main = NA)
+    hist(mid2[mid2$sal.treat.x == "low"& mid2$SA.start > 100 & mid2$SA.start < 200,]$grow.ratio, add=T, col=green,probability=T)
+    
+    hist(mid3[mid3$sal.treat.x == "amb"& mid3$SA.start > 100 & mid3$SA.start < 200,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "29 dps", main = NA)
+    hist(mid3[mid3$sal.treat.x == "low"& mid3$SA.start > 100 & mid3$SA.start < 200,]$grow.ratio, add=T, col=green,probability=T)
+    
+    hist(end[end$sal.treat.x == "amb"& end$SA.start > 100 & end$SA.start < 200,]$grow.ratio, xlim=c(0.6,1.8),ylim=c(0,8), col=red,probability=T, xlab = "36 dps", main = NA)
+    hist(end[end$sal.treat.x == "low"& end$SA.start > 100 & end$SA.start < 200,]$grow.ratio, add=T, col=green,probability=T)
+
+```
+GROWTH RATE VISUALIZATION; as distributions subset as either high/low S and then binned by TA; and violin binning size groups
+```{r}
+#looking at distribution of growth based on treatments...
+  # Combined histograms
+      
+#binned by S violin plot of TA and size differences; all time points
+      #https://r-coder.com/violin-plot-r/?utm_content=cmp-true
+vioplot(high.s$grow.ratio ~ high.s$TA.treat.x + high.s$size,
+        col = "grey",               # Color of the area
+        lineCol = "black",     # Color of the line
+        colMed = "black",      # Pch symbol color
+        border = "black",      # Color of the border of the violin
+        pchMed = 16,           # Pch symbol for the median
+        method = "jitter",
+        ylim = c(0.6,1.8),
+        plotCentre = "points") # If "line", plots a median line
+vioplot(low.s$grow.ratio ~ low.s$TA.treat.x + low.s$size,
+        col = "grey",               # Color of the area
+        lineCol = "black",     # Color of the line
+        colMed = "black",      # Pch symbol color
+        border = "black",      # Color of the border of the violin
+        pchMed = 16,           # Pch symbol for the median
+        method = "jitter",
+        ylim = c(0.6,1.8),
+        plotCentre = "points") # If "line", plots a median line
+
+#now separated by time
+par(mfrow = c(1,1))
+#low S
+col1 = adjustcolor( "grey30", alpha.f = 0.25)
+col2 = adjustcolor( "grey30", alpha.f = 0.25)
+col3 = adjustcolor( "grey30", alpha.f = 0.25)
+col4 = adjustcolor( "grey30", alpha.f = 0.25)
+vioplot(low.s[low.s$dps == 7,]$grow.ratio ~ low.s[low.s$dps == 7,]$size + low.s[low.s$dps == 7,]$TA.treat.x,
+        col = col1,               # Color of the area
+        lineCol = "black",     # Color of the line
+        colMed = "black",      # Pch symbol color
+        border = "black",      # Color of the border of the violin
+        pchMed = 16,           # Pch symbol for the median
+        method = "jitter",
+        ylim = c(0.75,1.6),
+        horizontal = T,
+        las = 1,
+        lwd = 2,
+        plotCentre = "points") # If "line", plots a median line
+vioplot(low.s[low.s$dps == 15,]$grow.ratio ~ low.s[low.s$dps == 15,]$size + low.s[low.s$dps == 15,]$TA.treat.x,
+        col = col2,               # Color of the area
+        lineCol = "black",     # Color of the line
+        colMed = "black",      # Pch symbol color
+        border = "black",      # Color of the border of the violin
+        pchMed = 16,           # Pch symbol for the median
+        method = "jitter",
+        ylim = c(0.75,1.6),
+        horizontal = T,
+        add = T,
+        las = 1,
+        lwd = 2,
+        plotCentre = "points") # If "line", plots a median line
+vioplot(low.s[low.s$dps == 29,]$grow.ratio ~ low.s[low.s$dps == 29,]$size + low.s[low.s$dps == 29,]$TA.treat.x,
+        col = col3,               # Color of the area
+        lineCol = "black",     # Color of the line
+        colMed = "black",      # Pch symbol color
+        border = "black",      # Color of the border of the violin
+        pchMed = 16,           # Pch symbol for the median
+        method = "jitter",
+        ylim = c(0.75,1.6),        
+        horizontal = T,
+        las = 1,
+        lwd = 2,
+        add = T,
+        plotCentre = "points") # If "line", plots a median line
+vioplot(low.s[low.s$dps == 36,]$grow.ratio ~ low.s[low.s$dps == 36,]$size + low.s[low.s$dps == 36,]$TA.treat.x,
+        col = col4,               # Color of the area
+        lineCol = "black",     # Color of the line
+        colMed = "black",      # Pch symbol color
+        border = "black",      # Color of the border of the violin
+        pchMed = 16,           # Pch symbol for the median
+        method = "jitter",
+        ylim = c(0.75,1.6),
+        lwd = 2,
+        horizontal = T,
+        las = 1,
+        add = T,
+        plotCentre = "points") # If "line", plots a median line
+abline(v=1, lwd = 3, col = "goldenrod")
+   
+#high S
+par(mar=c(5,7,2,1))
+vioplot(high.s[high.s$dps == 7,]$grow.ratio ~ high.s[high.s$dps == 7,]$size + high.s[high.s$dps == 7,]$TA.treat.x,
+        col = col1,               # Color of the area
+        lineCol = "black",     # Color of the line
+        colMed = "black",      # Pch symbol color
+        border = "black",      # Color of the border of the violin
+        pchMed = 16,           # Pch symbol for the median
+        method = "jitter",
+        ylim = c(0.75,1.6),
+        horizontal = T,
+        las = 1,
+        lwd = 2,
+        plotCentre = "points") # If "line", plots a median line
+vioplot(high.s[high.s$dps == 15,]$grow.ratio ~ high.s[high.s$dps == 15,]$size + high.s[high.s$dps == 15,]$TA.treat.x,
+        col = col2,               # Color of the area
+        lineCol = "black",     # Color of the line
+        colMed = "black",      # Pch symbol color
+        border = "black",      # Color of the border of the violin
+        pchMed = 16,           # Pch symbol for the median
+        method = "jitter",
+        ylim = c(0.75,1.6),
+        horizontal = T,
+        add = T,
+        las = 1,
+        lwd = 2,
+        plotCentre = "points") # If "line", plots a median line
+vioplot(high.s[high.s$dps == 29,]$grow.ratio ~ high.s[high.s$dps == 29,]$size + high.s[high.s$dps == 29,]$TA.treat.x,
+        col = col3,               # Color of the area
+        lineCol = "black",     # Color of the line
+        colMed = "black",      # Pch symbol color
+        border = "black",      # Color of the border of the violin
+        pchMed = 16,           # Pch symbol for the median
+        method = "jitter",
+        ylim = c(0.75,1.6),        
+        horizontal = T,
+        las = 1,
+        lwd = 2,
+        add = T,
+        plotCentre = "points") # If "line", plots a median line
+vioplot(high.s[high.s$dps == 36,]$grow.ratio ~ high.s[high.s$dps == 36,]$size + high.s[high.s$dps == 36,]$TA.treat.x,
+        col = col4,               # Color of the area
+        lineCol = "black",     # Color of the line
+        colMed = "black",      # Pch symbol color
+        border = "black",      # Color of the border of the violin
+        pchMed = 16,           # Pch symbol for the median
+        method = "jitter",
+        ylim = c(0.75,1.6),
+        lwd = 2,
+        horizontal = T,
+        las = 1,
+        add = T,
+        plotCentre = "points") # If "line", plots a median line
+abline(v=1, lwd = 3, col = "goldenrod")
 
 
-#calculating medians SAL
-b1.S = median(sw[sw$`Bucket#` == 1,]$S)
-b2.S = median(sw[sw$`Bucket#` == 2,]$S)
-b3.S = median(sw[sw$`Bucket#` == 3,]$S)
-b4.S = median(sw[sw$`Bucket#` == 4,]$S)
-b5.S = median(sw[sw$`Bucket#` == 5,]$S)
-b6.S = median(sw[sw$`Bucket#` == 6,]$S)
-b7.S = median(sw[sw$`Bucket#` == 7,]$S)
-b8.S = median(sw[sw$`Bucket#` == 8,]$S)
-b9.S = median(sw[sw$`Bucket#` == 9,]$S)
-b10.S = median(sw[sw$`Bucket#` == 10,]$S)
-b11.S = median(sw[sw$`Bucket#` ==11,]$S)
-b12.S = median(sw[sw$`Bucket#` == 12,]$S)
-b13.S = median(sw[sw$`Bucket#` == 13,]$S)
-b14.S = median(sw[sw$`Bucket#` == 14,]$S)
 
-#adding a column to gro
-gro$med.S = 0
-gro$med.S[gro$`Bucket#` == 1] <- b1.S
-gro$med.S[gro$`Bucket#` == 2] <- b2.S
-gro$med.S[gro$`Bucket#` == 3] <- b3.S
-gro$med.S[gro$`Bucket#` == 4] <- b4.S
-gro$med.S[gro$`Bucket#` == 5] <- b5.S
-gro$med.S[gro$`Bucket#` == 6] <- b6.S
-gro$med.S[gro$`Bucket#` == 7] <- b7.S
-gro$med.S[gro$`Bucket#` == 8] <- b8.S
-gro$med.S[gro$`Bucket#` == 9] <- b9.S
-gro$med.S[gro$`Bucket#` == 10] <- b10.S
-gro$med.S[gro$`Bucket#` == 11] <- b11.S
-gro$med.S[gro$`Bucket#` == 12] <- b12.S
-gro$med.S[gro$`Bucket#` == 13] <- b13.S
-gro$med.S[gro$`Bucket#` == 14] <- b14.S
+#all sizes lumped
+vioplot(high.s[high.s$dps == 15,]$grow.ratio ~ high.s[high.s$dps == 15,]$TA.treat.x,
+        col = col1,               # Color of the area
+        lineCol = "black",     # Color of the line
+        colMed = "black",      # Pch symbol color
+        border = "black",      # Color of the border of the violin
+        pchMed = 16,           # Pch symbol for the median
+        method = "jitter",
+        ylim = c(0.75,1.6),
+        horizontal = T,
+        las = 1,
+        lwd = 2,
+        plotCentre = "points") # If "line", plots a median line
+vioplot(high.s[high.s$dps == 36,]$grow.ratio ~ high.s[high.s$dps == 36,]$TA.treat.x,
+        col = col1,               # Color of the area
+        lineCol = "black",     # Color of the line
+        colMed = "black",      # Pch symbol color
+        border = "black",      # Color of the border of the violin
+        pchMed = 16,           # Pch symbol for the median
+        method = "jitter",
+        ylim = c(0.75,1.6),
+        horizontal = T,
+        las = 1,
+        add = T,
+        lwd = 2,
+        plotCentre = "points") # If "line", plots a median line
+abline(v=1, lwd = 3, col = "goldenrod")
+vioplot(low.s[low.s$dps == 15,]$grow.ratio ~ low.s[low.s$dps == 15,]$TA.treat.x,
+        col = col1,               # Color of the area
+        lineCol = "black",     # Color of the line
+        colMed = "black",      # Pch symbol color
+        border = "black",      # Color of the border of the violin
+        pchMed = 16,           # Pch symbol for the median
+        method = "jitter",
+        ylim = c(0.75,1.6),
+        horizontal = T,
+        las = 1,
+        lwd = 2,
+        plotCentre = "points") # If "line", plots a median line
+vioplot(low.s[low.s$dps == 36,]$grow.ratio ~ low.s[low.s$dps == 36,]$TA.treat.x,
+        col = col1,               # Color of the area
+        lineCol = "black",     # Color of the line
+        colMed = "black",      # Pch symbol color
+        border = "black",      # Color of the border of the violin
+        pchMed = 16,           # Pch symbol for the median
+        method = "jitter",
+        ylim = c(0.75,1.6),
+        horizontal = T,
+        las = 1,
+        add = T,
+        lwd = 2,
+        plotCentre = "points") # If "line", plots a median line
+```
+testing the effect of TA on growth ratios within the two salinities; and then also looking at size as a factor? 
+```{r}
+par(mfrow = c(1,1))
+#not treating bin as a random effect but need to disclaimer that each bin may be considered a pseudo replicate? 
 
-#gro + controls
-gro.full = gro
+#looking at the first week "shock effect"
+plot(dat[dat$dps == 7,]$grow.ratio ~ dat[dat$dps == 7,]$med.ta , pch = 19)
+boxplot(dat[dat$dps == 7,]$grow.ratio ~ dat[dat$dps == 7,]$sal.treat.x , pch = 19)
+plot((dat[dat$dps == 7,]$mm2.diff.start)/7 ~ dat[dat$dps == 7,]$SA.start , pch = 21, ylab = "mm2 growth per day", bg = "orchid1")
+abline(lm((dat[dat$dps == 7,]$mm2.diff.start)/7 ~ dat[dat$dps == 7,]$SA.start), lwd = 3, col = "orchid1")
+#checking the sizes and distributions of the plates
+vioplot(dat[dat$dps == 7,]$SA.start ~ dat[dat$dps == 7,]$Plate.x)
+summary(aov(SA.start ~ as.factor(Plate.x), data = dat[dat$dps == 7,])) #no difference in start mean of sizes
 
-#omitting control oysters
-gro = gro[gro$med.S > 0 & gro$med.ta > 0,]
+mod2 = lm(dat[dat$dps == 7,]$grow.ratio ~ dat[dat$dps == 7,]$med.ta + dat[dat$dps == 7,]$med.S + dat[dat$dps == 7,]$med.pH + dat[dat$dps == 7,]$SA.start)
+summary(mod2)
+#in this case, salinity was an important factor with higher S resulting in higher growth rate. not surprising because they were prior acclimated to ambient SW salinity conditions. additionally, pH was significant along with the starting size, with smaller individuals growing more than larger individuals after 7 days
 
-#new df with conditions and SA and weight
-new = cbind(gro,sa)
-#omitting CV that fell off? 
-new = new[new$CV_ID != 146 & 
-            new$CV_ID != 149 &
-            new$CV_ID != 150 & 
-            new$CV_ID != 161 & 
-            new$CV_ID != 174 & 
-            new$CV_ID != 192 & 
-            new$CV_ID != 203 & 
-            new$CV_ID != 205 & 
-            new$CV_ID != 218 & 
-            new$CV_ID != 223 & 
-            new$CV_ID != 241 & 
-            new$CV_ID != 296 & 
-            new$CV_ID != 297 &
-            new$CV_ID != 298 & 
-            new$CV_ID != 300 & 
-            new$CV_ID != 301 & 
-            new$CV_ID != 306 & 
-            new$CV_ID != 311 & 
-            new$CV_ID != 320 &
-            new$CV_ID != 326 & 
-            new$CV_ID != 327 & 
-            new$CV_ID != 329 & 
-            new$CV_ID != 337 & 
-            new$CV_ID != 348 & 
-            new$CV_ID != 360 &
-            new$CV_ID != 367 & 
-            new$CV_ID != 387 & 
-            new$CV_ID != 388 &
-            new$CV_ID != 403 &
-            new$CV_ID != 409 &
-            new$CV_ID != 419 & 
-            new$CV_ID != 437 & 
-            new$CV_ID != 442 &
-            new$CV_ID != 464 & 
-            new$CV_ID != 465 & 
-            new$CV_ID != 466 & 
-            new$CV_ID != 468 & 
-            new$CV_ID != 470 & 
-            new$CV_ID != 472 &
-            new$CV_ID != 473 &
-            new$CV_ID != 479 & 
-            new$CV_ID != 482 & 
-            new$CV_ID != 485 & 
-            new$CV_ID != 491 & 
-            new$CV_ID != 517 & 
-            new$CV_ID != 541 &
-            new$CV_ID != 542 & 
-            new$CV_ID != 544 & 
-            new$CV_ID != 549 & 
-            new$CV_ID != 561 & 
-            new$CV_ID != 564 &
-            new$CV_ID != 566 & 
-            new$CV_ID != 567 & 
-            new$CV_ID != 570 & 
-            new$CV_ID != 571 & 
-            new$CV_ID != 577 &
-            new$CV_ID != 578 & 
-            new$CV_ID != 581,]
+#now looking at day 15, which should mean fully acclimated
+plot(dat[dat$dps == 15,]$grow.ratio ~ dat[dat$dps == 15,]$med.ta , pch = 19)
+boxplot(dat[dat$dps == 15,]$grow.ratio ~ dat[dat$dps == 15,]$sal.treat.x , pch = 19)
+plot((dat[dat$dps == 15,]$mm2.diff.start)/15 ~ dat[dat$dps == 15,]$SA.start , pch = 21, ylab = "mm2 growth per day", bg = "orchid3")
+abline(lm((dat[dat$dps == 15,]$mm2.diff.start)/15 ~ dat[dat$dps == 15,]$SA.start), lwd = 3, col = "orchid3")
 
-plot(new$diff.perc, pch = 19, col = "white")
-points(new$mid.diff.perc, pch = 19, col = "blue")
-points(new$mid.end.perc, pch = 19, col = "dark green")
+summary(aov(SA.start ~ as.factor(Plate.x), data = dat[dat$dps == 15,])) #no difference in start mean of sizes left
 
-new$delta.rates = new$mid.end.perc - new$mid.diff.perc
+mod3 = lm(dat[dat$dps == 15,]$grow.ratio ~ dat[dat$dps == 15,]$med.ta + dat[dat$dps == 15,]$med.S + dat[dat$dps == 15,]$med.pH + dat[dat$dps == 15,]$SA.start)
+summary(mod3)
+#after 15 days post acclimation, pH and size were not a factor, however oysters in lower salinity grew more than those in ambient conditions. TA was also not a factor.
 
-boxplot(new$delta.rates ~ new$sal.treat + new$TA.treat, pch = 19)
+#finally, the end time stamp
+plot(dat[dat$dps == 36,]$grow.ratio ~ dat[dat$dps == 36,]$med.ta , pch = 19)
+boxplot(dat[dat$dps == 36,]$grow.ratio ~ dat[dat$dps == 36,]$sal.treat.x , pch = 19)
+plot((dat[dat$dps == 36,]$mm2.diff.start)/36 ~ dat[dat$dps == 36,]$SA.start , pch = 21, bg = "orchid4", ylab = "mm2 growth per day")
+abline(lm((dat[dat$dps == 36,]$mm2.diff.start)/36 ~ dat[dat$dps == 36,]$SA.start), lwd = 3, col = "orchid4")
+summary(aov(SA.start ~ as.factor(Plate.x), data = dat[dat$dps == 36,])) #no difference in start mean of sizes left
 
-plot(new$diff.perc ~ new$mid.diff.perc, pch = 19)
+mod1 = lm(dat[dat$dps == 36,]$grow.ratio ~ dat[dat$dps == 36,]$med.ta + dat[dat$dps == 36,]$med.S + dat[dat$dps == 36,]$med.pH + dat[dat$dps == 36,]$SA.start)
+summary(mod1)
+#no effect of starting size or of Salinity on final growth ratio; effect of TA and pH treatment...
+mod.phta = lm(sw$pH ~ sw$TA + sw$S)
+summary(mod.phta)
+#however pH and TA are correlated...sooooo. need to sort that out; but, S is not correlated to pH.
+
+
+
+#looking at all of the growth rate (mm2/day) vs starting size together...
+plot((dat[dat$dps == 7,]$mm2.diff.start)/7 ~ dat[dat$dps == 7,]$SA.start , pch = 21, ylab = "mm2 growth per day", bg = "orchid1")
+abline(lm((dat[dat$dps == 7,]$mm2.diff.start)/7 ~ dat[dat$dps == 7,]$SA.start), lwd = 3, col = "orchid1")
+
+points((dat[dat$dps == 15,]$mm2.diff.start)/15 ~ dat[dat$dps == 15,]$SA.start , pch = 21, ylab = "mm2 growth per day", bg = "orchid3")
+abline(lm((dat[dat$dps == 15,]$mm2.diff.start)/15 ~ dat[dat$dps == 15,]$SA.start), lwd = 3, col = "orchid3")
+
+points((dat[dat$dps == 36,]$mm2.diff.start)/36 ~ dat[dat$dps == 36,]$SA.start , pch = 21, ylab = "mm2 growth per day", bg = "orchid4")
+abline(lm((dat[dat$dps == 36,]$mm2.diff.start)/36 ~ dat[dat$dps == 36,]$SA.start), lwd = 3, col = "orchid4")
+#shows that between 7 and 15 days, growth rates increased for larger individuals but did not change between 15 and 36 days
+
+```
+
+
+
+
+creating size bins for data
+```{r}
+dat$size = NA
+dat[dat$SA.start < 100,]$size <- "small"
+dat[dat$SA.start > 100 & dat$SA.start < 200,]$size <- "medium"
+dat[dat$SA.start > 200,]$size <- "large"
+```
+---------------HIGH SALINITY-----------------------------
+1. define kernel density lines for each size/TA bin, across time points in ambient salinity.
+```{r}
+kd1.7 <- density(dat[dat$TA.treat.x == 1000 & dat$dps == 7 & dat$sal.treat.x == "amb",]$grow.ratio)
+      kd1.7s <- density(dat[dat$TA.treat.x == 1000 
+              & dat$dps == 7 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "small",]$grow.ratio)
+      kd1.7m <- density(dat[dat$TA.treat.x == 1000 
+              & dat$dps == 7 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "medium",]$grow.ratio)
+      kd1.7l <- density(dat[dat$TA.treat.x == 1000 
+              & dat$dps == 7 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "large",]$grow.ratio)
+kd2.7 <- density(dat[dat$TA.treat.x == 2000 & dat$dps == 7 & dat$sal.treat.x == "amb",]$grow.ratio)
+      kd2.7s <- density(dat[dat$TA.treat.x == 2000 
+              & dat$dps == 7 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "small",]$grow.ratio)
+      kd2.7m <- density(dat[dat$TA.treat.x == 2000 
+              & dat$dps == 7 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "medium",]$grow.ratio)
+      kd2.7l <- density(dat[dat$TA.treat.x == 2000 
+              & dat$dps == 7 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "large",]$grow.ratio)
+kd3.7 <- density(dat[dat$TA.treat.x == 3000 & dat$dps == 7 & dat$sal.treat.x == "amb",]$grow.ratio)
+      kd3.7s <- density(dat[dat$TA.treat.x == 3000 
+              & dat$dps == 7 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "small",]$grow.ratio)
+      kd3.7m <- density(dat[dat$TA.treat.x == 3000 
+              & dat$dps == 7 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "medium",]$grow.ratio)
+      kd3.7l <- density(dat[dat$TA.treat.x == 3000 
+              & dat$dps == 7 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "large",]$grow.ratio)
+
+kd1.15 <- density(dat[dat$TA.treat.x == 1000 & dat$dps == 15 & dat$sal.treat.x == "amb",]$grow.ratio)
+      kd1.15s <- density(dat[dat$TA.treat.x == 1000 
+              & dat$dps == 15 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "small",]$grow.ratio)
+      kd1.15m <- density(dat[dat$TA.treat.x == 1000 
+              & dat$dps == 15 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "medium",]$grow.ratio)
+      kd1.15l <- density(dat[dat$TA.treat.x == 1000 
+              & dat$dps == 15 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "large",]$grow.ratio)
+kd2.15 <- density(dat[dat$TA.treat.x == 2000 & dat$dps == 15 & dat$sal.treat.x == "amb",]$grow.ratio)
+      kd2.15s <- density(dat[dat$TA.treat.x == 2000 
+              & dat$dps == 15 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "small",]$grow.ratio)
+      kd2.15m <- density(dat[dat$TA.treat.x == 2000 
+              & dat$dps == 15 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "medium",]$grow.ratio)
+      kd2.15l <- density(dat[dat$TA.treat.x == 2000 
+              & dat$dps == 15 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "large",]$grow.ratio)
+kd3.15 <- density(dat[dat$TA.treat.x == 3000 & dat$dps == 15 & dat$sal.treat.x == "amb",]$grow.ratio)
+      kd3.15s <- density(dat[dat$TA.treat.x == 3000 
+              & dat$dps == 15 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "small",]$grow.ratio)
+      kd3.15m <- density(dat[dat$TA.treat.x == 3000 
+              & dat$dps == 15 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "medium",]$grow.ratio)
+      kd3.15l <- density(dat[dat$TA.treat.x == 3000 
+              & dat$dps == 15 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "large",]$grow.ratio)
+
+kd1.36 <- density(dat[dat$TA.treat.x == 1000 & dat$dps == 36 & dat$sal.treat.x == "amb",]$grow.ratio)
+      kd1.36s <- density(dat[dat$TA.treat.x == 1000 
+              & dat$dps == 36 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "small",]$grow.ratio)
+      kd1.36m <- density(dat[dat$TA.treat.x == 1000 
+              & dat$dps == 36 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "medium",]$grow.ratio)
+      kd1.36l <- density(dat[dat$TA.treat.x == 1000 
+              & dat$dps == 36 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "large",]$grow.ratio)
+kd2.36 <- density(dat[dat$TA.treat.x == 2000 & dat$dps == 36 & dat$sal.treat.x == "amb",]$grow.ratio)
+      kd2.36s <- density(dat[dat$TA.treat.x == 2000 
+              & dat$dps == 36 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "small",]$grow.ratio)
+      kd2.36m <- density(dat[dat$TA.treat.x == 2000 
+              & dat$dps == 36 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "medium",]$grow.ratio)
+      kd2.36l <- density(dat[dat$TA.treat.x == 2000 
+              & dat$dps == 36 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "large",]$grow.ratio)
+kd3.36 <- density(dat[dat$TA.treat.x == 3000 & dat$dps == 36 & dat$sal.treat.x == "amb",]$grow.ratio)
+      kd3.36s <- density(dat[dat$TA.treat.x == 3000 
+              & dat$dps == 36 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "small",]$grow.ratio)
+      kd3.36m <- density(dat[dat$TA.treat.x == 3000 
+              & dat$dps == 36 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "medium",]$grow.ratio)
+      kd3.36l <- density(dat[dat$TA.treat.x == 3000 
+              & dat$dps == 36 
+              & dat$sal.treat.x == "amb"
+              & dat$size == "large",]$grow.ratio)
+```
+
+looking at just density lines
+```{r}
+#by date
+plot(kd1.7s, ylim = c(0,12))
+  lines(kd1.7m)
+  lines(kd1.7l)
+  lines(kd1.7s)
+  
+  lines(kd2.7s)
+  lines(kd2.7m)
+  lines(kd2.7l)
+  
+  lines(kd3.7s)
+  lines(kd3.7m)
+  lines(kd3.7l)
+  
+plot(kd1.15s, ylim = c(0,12))
+  lines(kd1.15m)
+  lines(kd1.15l)
+  lines(kd1.15s)
+  
+  lines(kd2.15s)
+  lines(kd2.15m)
+  lines(kd2.15l)
+  
+  lines(kd3.15s)
+  lines(kd3.15m)
+  lines(kd3.15l)
+  
+plot(kd1.36s, ylim = c(0,12))
+  lines(kd1.36m)
+  lines(kd1.36l)
+  lines(kd1.36s)
+  
+  lines(kd2.36s)
+  lines(kd2.36m)
+  lines(kd2.36l)
+  
+  lines(kd3.36s)
+  lines(kd3.36m)
+  lines(kd3.36l)
+#binned by TA
+plot(kd1.7, ylim = c(0,12))
+  lines(kd1.7m)
+  lines(kd1.7l)
+  lines(kd1.7s)
+  lines(kd1.15s)
+  lines(kd1.15m)
+  lines(kd1.15l)
+  lines(kd1.36m)
+  lines(kd1.36l)
+  lines(kd1.36s)
+plot(kd2.7, ylim = c(0,12))
+  lines(kd2.7m)
+  lines(kd2.7l)
+  lines(kd2.7s)
+  lines(kd2.15s)
+  lines(kd2.15m)
+  lines(kd2.15l)
+  lines(kd2.36m)
+  lines(kd2.36l)
+  lines(kd2.36s)
+plot(kd3.7, ylim = c(0,12))
+  lines(kd3.7m)
+  lines(kd3.7l)
+  lines(kd3.7s)
+  lines(kd3.15s)
+  lines(kd3.15m)
+  lines(kd3.15l)
+  lines(kd3.36m)
+  lines(kd3.36l)
+  lines(kd3.36s)
+  
+  
+
+```
+EFFECT OF SIZE AND ALKALINITY ON AVERAGE GROWTH RATIO AT DPS = 7, 15, 36
+mean growth ratio within: HIGH SALINITY
+        among: SIZE CLASSES + TA LEVELS
+stat test: 
+overall, looks like the mean growth ratio is similar within size classes across the TA treatments at each time interval, however, the mid TA level often has a steeper peak than low and high TA
+```{r}
+red <- rgb (1, 0, 0, alpha=0.15) 
+green <- rgb (1, 1, 0, alpha=0.15)
+blue <- rgb (0, 0, 1, alpha=0.15)
+par(mfrow = c(2,2))
+#dps = 7
+      #all sizes: similar N values
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 7 & dat$sal.treat.x == "amb",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "7 dps", main = "all sizes")
+  lines(kd2.7,lwd = 3, col = "red", lty = 1)
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 7 & dat$sal.treat.x == "amb",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "7 dps", main = "all sizes", add = T)
+  lines(kd1.7,lwd = 3, col = "goldenrod4", lty = 1)
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 7 & dat$sal.treat.x == "amb",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "7 dps", main = "all sizes", add = T)
+  lines(kd3.7,lwd = 3, col = "blue", lty = 1)
+  #takeaways: means look similar in all cases; mid TA has highest peak (fewer outliers) whereas the spread in the other two is similar (more outliers)
+  
+      #small
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 7 & dat$sal.treat.x == "amb" & dat$size == "small",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "7 dps", main = "small")
+  lines(kd2.7s,lwd = 3, col = "red", lty = 1)
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 7 & dat$sal.treat.x == "amb"& dat$size == "small",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "7 dps", main = "all sizes", add = T)
+  lines(kd1.7s,lwd = 3, col = "goldenrod4", lty = 1)
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 7 & dat$sal.treat.x == "amb"& dat$size == "small",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "7 dps", main = "all sizes", add = T)
+  lines(kd3.7s,lwd = 3, col = "blue", lty = 1)
+  
+      #medium
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 7 & dat$sal.treat.x == "amb" & dat$size == "medium",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,12), col=red, probability=T, xlab = "7 dps", main = "medium")
+  lines(kd2.7m,lwd = 3, col = "red", lty = 1)
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 7 & dat$sal.treat.x == "amb"& dat$size == "medium",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "7 dps", main = "all sizes", add = T)
+  lines(kd1.7m,lwd = 3, col = "goldenrod4", lty = 1)
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 7 & dat$sal.treat.x == "amb"& dat$size == "medium",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "7 dps", main = "all sizes", add = T)
+  lines(kd3.7m,lwd = 3, col = "blue", lty = 1)
+  
+      #large
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 7 & dat$sal.treat.x == "amb" & dat$size == "large",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "7 dps", main = "large")
+  lines(kd2.7l,lwd = 3, col = "red", lty = 1)
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 7 & dat$sal.treat.x == "amb"& dat$size == "large",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "7 dps", main = "all sizes", add = T)
+  lines(kd1.7l,lwd = 3, col = "goldenrod4", lty = 1)
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 7 & dat$sal.treat.x == "amb"& dat$size == "large",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "7 dps", main = "all sizes", add = T)
+  lines(kd3.7l,lwd = 3, col = "blue", lty = 1)
+
+#dps = 15
+      #all sizes
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 15 & dat$sal.treat.x == "amb",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "15 dps", main = "all sizes")
+  lines(kd2.15,lwd = 3, col = "red", lty = 2)
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 15 & dat$sal.treat.x == "amb",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "15 dps", main = "all sizes", add = T)
+  lines(kd1.15,lwd = 3, col = "goldenrod4", lty = 2)
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 15 & dat$sal.treat.x == "amb",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "15 dps", main = "all sizes", add = T)
+  lines(kd3.15,lwd = 3, col = "blue", lty = 2)
+  #takeaways: all peaks are a similar height and means look similar
+  
+      #small
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 15 & dat$sal.treat.x == "amb" & dat$size == "small",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "15 dps", main = "small")
+  lines(kd2.15s,lwd = 3, col = "red", lty = 2)
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 15 & dat$sal.treat.x == "amb"& dat$size == "small",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "15 dps", main = "all sizes", add = T)
+  lines(kd1.15s,lwd = 3, col = "goldenrod4", lty = 2)
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 15 & dat$sal.treat.x == "amb"& dat$size == "small",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "15 dps", main = "all sizes", add = T)
+  lines(kd3.15s,lwd = 3, col = "blue", lty = 2)
+  
+      #medium
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 15 & dat$sal.treat.x == "amb" & dat$size == "medium",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,12), col=red, probability=T, xlab = "15 dps", main = "medium")
+  lines(kd2.15m,lwd = 3, col = "red", lty = 2)
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 15 & dat$sal.treat.x == "amb"& dat$size == "medium",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "15 dps", main = "all sizes", add = T)
+  lines(kd1.15m,lwd = 3, col = "goldenrod4", lty = 2)
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 15 & dat$sal.treat.x == "amb"& dat$size == "medium",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "15 dps", main = "all sizes", add = T)
+  lines(kd3.15m,lwd = 3, col = "blue", lty = 2)
+  
+      #large
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 15 & dat$sal.treat.x == "amb" & dat$size == "large",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "15 dps", main = "large")
+  lines(kd2.15l,lwd = 3, col = "red", lty = 2)
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 15 & dat$sal.treat.x == "amb"& dat$size == "large",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "15 dps", main = "all sizes", add = T)
+  lines(kd1.15l,lwd = 3, col = "goldenrod4", lty = 2)
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 15 & dat$sal.treat.x == "amb"& dat$size == "large",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "15 dps", main = "all sizes", add = T)
+  lines(kd3.15l,lwd = 3, col = "blue", lty = 2)
+
+
+#dps = 36
+      #all sizes
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 36 & dat$sal.treat.x == "amb",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "36 dps", main = "all sizes")
+  lines(kd2.36,lwd = 3, col = "red", lty = 3)
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 36 & dat$sal.treat.x == "amb",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "36 dps", main = "all sizes", add = T)
+  lines(kd1.36,lwd = 3, col = "goldenrod4", lty = 3)
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 36 & dat$sal.treat.x == "amb",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "36 dps", main = "all sizes", add = T)
+  lines(kd3.36,lwd = 3, col = "blue", lty = 3)
+  
+      #small
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 36 & dat$sal.treat.x == "amb" & dat$size == "small",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "36 dps", main = "small")
+  lines(kd2.36s,lwd = 3, col = "red", lty = 3)
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 36 & dat$sal.treat.x == "amb"& dat$size == "small",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "36 dps", main = "all sizes", add = T)
+  lines(kd1.36s,lwd = 3, col = "goldenrod4", lty = 3)
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 36 & dat$sal.treat.x == "amb"& dat$size == "small",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "36 dps", main = "all sizes", add = T)
+  lines(kd3.36s,lwd = 3, col = "blue", lty = 3)
+  
+      #medium
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 36 & dat$sal.treat.x == "amb" & dat$size == "medium",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,12), col=red, probability=T, xlab = "36 dps", main = "medium")
+  lines(kd2.36m,lwd = 3, col = "red", lty = 3)
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 36 & dat$sal.treat.x == "amb"& dat$size == "medium",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "36 dps", main = "all sizes", add = T)
+  lines(kd1.36m,lwd = 3, col = "goldenrod4", lty = 3)
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 36 & dat$sal.treat.x == "amb"& dat$size == "medium",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "36 dps", main = "all sizes", add = T)
+  lines(kd3.36m,lwd = 3, col = "blue", lty = 3)
+  
+      #large
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 36 & dat$sal.treat.x == "amb" & dat$size == "large",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "36 dps", main = "large")
+  lines(kd2.36l,lwd = 3, col = "red", lty = 3)
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 36 & dat$sal.treat.x == "amb"& dat$size == "large",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "36 dps", main = "all sizes", add = T)
+  lines(kd1.36l,lwd = 3, col = "goldenrod4", lty = 3)
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 36 & dat$sal.treat.x == "amb"& dat$size == "large",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "36 dps", main = "all sizes", add = T)
+  lines(kd3.36l,lwd = 3, col = "blue", lty = 3)
+```
+
+EFFECT OF TIME ON GROWTH RATIO (ACCLIMATION DIFFERENCES) WITHIN EACH TREATMENT GROUP
+mean growth ratio within: TREATMENT GROUP (TA/S) + SIZE
+                  #across time: 7 VS 15 VS 36 DPS
+stat test? X
+```{r}
+#all sizes:
+par(mfrow = c(3,1))
+#mid TA_ all sizes
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 7 & dat$sal.treat.x == "amb",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "growth (x:start)", main = "all sizes")
+  lines(kd2.7,lwd = 3, col = "red1", lty = 1)
+  hist(dat[dat$TA.treat.x == 2000 & dat$dps == 15 & dat$sal.treat.x == "amb",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "15 dps", main = "all sizes", add = T)
+  lines(kd2.15,lwd = 3, col = "red3", lty = 2)
+  hist(dat[dat$TA.treat.x == 2000 & dat$dps == 36 & dat$sal.treat.x == "amb",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "36 dps", main = "all sizes", add = T)
+  lines(kd2.36,lwd = 3, col = "red4", lty = 3)
+
+#amb TA_ all sizes
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 7 & dat$sal.treat.x == "amb",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "growth (x:start)", main = "all sizes")
+  lines(kd1.7,lwd = 3, col = "goldenrod1", lty = 1)
+  hist(dat[dat$TA.treat.x == 1000 & dat$dps == 15 & dat$sal.treat.x == "amb",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "15 dps", main = "all sizes", add = T)
+  lines(kd1.15,lwd = 3, col = "goldenrod3", lty = 2)
+  hist(dat[dat$TA.treat.x == 1000 & dat$dps == 36 & dat$sal.treat.x == "amb",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "36 dps", main = "all sizes", add = T)
+  lines(kd1.36,lwd = 3, col = "goldenrod4", lty = 3)
+  
+#high TA_ all sizes
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 7 & dat$sal.treat.x == "amb",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "growth (x:start)", main = "all sizes")
+  lines(kd3.7,lwd = 3, col = "blue1", lty = 1)
+  hist(dat[dat$TA.treat.x == 3000 & dat$dps == 15 & dat$sal.treat.x == "amb",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "15 dps", main = "all sizes", add = T)
+  lines(kd3.15,lwd = 3, col = "blue3", lty = 2)
+  hist(dat[dat$TA.treat.x == 3000 & dat$dps == 36 & dat$sal.treat.x == "amb",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "36 dps", main = "all sizes", add = T)
+  lines(kd3.36,lwd = 3, col = "blue4", lty = 3)
+
+  
+#binned by TA and size (looks at the acclimation differences?)
+par(mfrow = c(1,1))
+  #low small
+  plot(kd1.7s, ylim = c(0,8), lwd = 2, xlim = c(0.7,1.5),col = "goldenrod1", main = "amb S: small size, low TA", xlab = "growth (x:start)")
+  lines(kd1.15s, lty = 2, lwd = 2,col = "goldenrod3")
+  lines(kd1.36s, lty = 3, lwd = 2,col = "goldenrod4")
+  
+  #low medium
+  plot(kd1.7m, ylim = c(0,8), lty = 1, lwd = 2, xlim = c(0.7,1.5),col = "goldenrod1", main = "amb S: medium size, low TA", xlab = "growth (x:start)")
+  lines(kd1.15m, lty = 2, lwd = 2,col = "goldenrod3")
+  lines(kd1.36m, lty = 3, lwd = 2,col = "goldenrod4")
+  
+  #low large
+  plot(kd1.7l, ylim = c(0,8), lty = 1, lwd = 2, xlim = c(0.7,1.5),col = "goldenrod1", main = "amb S: large size, low TA", xlab = "growth (x:start)")
+  lines(kd1.15l, lty = 2, lwd = 2,col = "goldenrod3")
+  lines(kd1.36l, lty = 3, lwd = 2,col = "goldenrod4")
+  
+   #mid small
+  plot(kd2.7s, ylim = c(0,6.5), lty = 1, lwd = 2, xlim = c(0.7,1.5),col = "red1", main = "amb S: small size, mod TA", xlab = "growth (x:start)")
+  lines(kd2.15s, lty = 2, lwd = 2,col = "red3")
+  lines(kd2.36s, lty = 3, lwd = 2,col = "red4")
+  
+  #mid medium
+  plot(kd2.7m, ylim = c(0,12), lty = 1, lwd = 2, xlim = c(0.7,1.5),col = "red1", main = "amb S: medium size, mod TA", xlab = "growth (x:start)")
+  lines(kd2.15m, lty = 2, lwd = 2,col = "red3")
+  lines(kd2.36m, lty = 3, lwd = 2,col = "red4")
+  
+  #mid large
+  plot(kd2.7l, ylim = c(0,10), lty = 1, lwd = 2, xlim = c(0.7,1.5),col = "red1", main = "amb S: large size, mod TA", xlab = "growth (x:start)")
+  lines(kd2.15, lty = 2, lwd = 2,col = "red3")
+  lines(kd2.36l, lty = 3, lwd = 2,col = "red4")
+  
+  #high small
+  plot(kd3.7s, ylim = c(0,8), lty = 1, lwd = 2, xlim = c(0.7,1.5),col = "blue1", main = "amb S: small size, high TA", xlab = "growth (x:start)")
+  lines(kd3.15s, lty = 2, lwd = 2,col = "blue3")
+  lines(kd3.36s, lty = 3, lwd = 2,col = "blue4")
+  
+  #high medium
+  plot(kd3.7m, ylim = c(0,6), lty = 1, lwd = 2, xlim = c(0.7,1.5),col = "blue1", main = "amb S: medium size, high TA", xlab = "growth (x:start)")
+  lines(kd3.15m, lty = 2, lwd = 2,col = "blue3")
+  lines(kd3.36m, lty = 3, lwd = 2,col = "blue4")
+  
+  #high large
+  plot(kd3.7l, ylim = c(0,6), lty = 1, lwd = 2, xlim = c(0.7,1.5),col = "blue1", main = "amb S: large size, high TA", xlab = "growth (x:start)")
+  lines(kd3.15l, lty = 2, lwd = 2,col = "blue3")
+  lines(kd3.36l, lty = 3, lwd = 2,col = "blue4")
+
+```
+
+-----------LOW SALINITY DATA BELOW-----------------------
+1. define kernel density lines for each size/TA bin, across time points in low salinity.
+```{r}
+kd1.7 <- density(dat[dat$TA.treat.x == 1000 & dat$dps == 7 & dat$sal.treat.x == "low",]$grow.ratio)
+      kd1.7s <- density(dat[dat$TA.treat.x == 1000 
+              & dat$dps == 7 
+              & dat$sal.treat.x == "low"
+              & dat$size == "small",]$grow.ratio)
+      kd1.7m <- density(dat[dat$TA.treat.x == 1000 
+              & dat$dps == 7 
+              & dat$sal.treat.x == "low"
+              & dat$size == "medium",]$grow.ratio)
+      kd1.7l <- density(dat[dat$TA.treat.x == 1000 
+              & dat$dps == 7 
+              & dat$sal.treat.x == "low"
+              & dat$size == "large",]$grow.ratio)
+kd2.7 <- density(dat[dat$TA.treat.x == 2000 & dat$dps == 7 & dat$sal.treat.x == "low",]$grow.ratio)
+      kd2.7s <- density(dat[dat$TA.treat.x == 2000 
+              & dat$dps == 7 
+              & dat$sal.treat.x == "low"
+              & dat$size == "small",]$grow.ratio)
+      kd2.7m <- density(dat[dat$TA.treat.x == 2000 
+              & dat$dps == 7 
+              & dat$sal.treat.x == "low"
+              & dat$size == "medium",]$grow.ratio)
+      kd2.7l <- density(dat[dat$TA.treat.x == 2000 
+              & dat$dps == 7 
+              & dat$sal.treat.x == "low"
+              & dat$size == "large",]$grow.ratio)
+kd3.7 <- density(dat[dat$TA.treat.x == 3000 & dat$dps == 7 & dat$sal.treat.x == "low",]$grow.ratio)
+      kd3.7s <- density(dat[dat$TA.treat.x == 3000 
+              & dat$dps == 7 
+              & dat$sal.treat.x == "low"
+              & dat$size == "small",]$grow.ratio)
+      kd3.7m <- density(dat[dat$TA.treat.x == 3000 
+              & dat$dps == 7 
+              & dat$sal.treat.x == "low"
+              & dat$size == "medium",]$grow.ratio)
+      kd3.7l <- density(dat[dat$TA.treat.x == 3000 
+              & dat$dps == 7 
+              & dat$sal.treat.x == "low"
+              & dat$size == "large",]$grow.ratio)
+
+kd1.15 <- density(dat[dat$TA.treat.x == 1000 & dat$dps == 15 & dat$sal.treat.x == "low",]$grow.ratio)
+      kd1.15s <- density(dat[dat$TA.treat.x == 1000 
+              & dat$dps == 15 
+              & dat$sal.treat.x == "low"
+              & dat$size == "small",]$grow.ratio)
+      kd1.15m <- density(dat[dat$TA.treat.x == 1000 
+              & dat$dps == 15 
+              & dat$sal.treat.x == "low"
+              & dat$size == "medium",]$grow.ratio)
+      kd1.15l <- density(dat[dat$TA.treat.x == 1000 
+              & dat$dps == 15 
+              & dat$sal.treat.x == "low"
+              & dat$size == "large",]$grow.ratio)
+kd2.15 <- density(dat[dat$TA.treat.x == 2000 & dat$dps == 15 & dat$sal.treat.x == "low",]$grow.ratio)
+      kd2.15s <- density(dat[dat$TA.treat.x == 2000 
+              & dat$dps == 15 
+              & dat$sal.treat.x == "low"
+              & dat$size == "small",]$grow.ratio)
+      kd2.15m <- density(dat[dat$TA.treat.x == 2000 
+              & dat$dps == 15 
+              & dat$sal.treat.x == "low"
+              & dat$size == "medium",]$grow.ratio)
+      kd2.15l <- density(dat[dat$TA.treat.x == 2000 
+              & dat$dps == 15 
+              & dat$sal.treat.x == "low"
+              & dat$size == "large",]$grow.ratio)
+kd3.15 <- density(dat[dat$TA.treat.x == 3000 & dat$dps == 15 & dat$sal.treat.x == "low",]$grow.ratio)
+      kd3.15s <- density(dat[dat$TA.treat.x == 3000 
+              & dat$dps == 15 
+              & dat$sal.treat.x == "low"
+              & dat$size == "small",]$grow.ratio)
+      kd3.15m <- density(dat[dat$TA.treat.x == 3000 
+              & dat$dps == 15 
+              & dat$sal.treat.x == "low"
+              & dat$size == "medium",]$grow.ratio)
+      kd3.15l <- density(dat[dat$TA.treat.x == 3000 
+              & dat$dps == 15 
+              & dat$sal.treat.x == "low"
+              & dat$size == "large",]$grow.ratio)
+
+kd1.36 <- density(dat[dat$TA.treat.x == 1000 & dat$dps == 36 & dat$sal.treat.x == "low",]$grow.ratio)
+      kd1.36s <- density(dat[dat$TA.treat.x == 1000 
+              & dat$dps == 36 
+              & dat$sal.treat.x == "low"
+              & dat$size == "small",]$grow.ratio)
+      kd1.36m <- density(dat[dat$TA.treat.x == 1000 
+              & dat$dps == 36 
+              & dat$sal.treat.x == "low"
+              & dat$size == "medium",]$grow.ratio)
+      kd1.36l <- density(dat[dat$TA.treat.x == 1000 
+              & dat$dps == 36 
+              & dat$sal.treat.x == "low"
+              & dat$size == "large",]$grow.ratio)
+kd2.36 <- density(dat[dat$TA.treat.x == 2000 & dat$dps == 36 & dat$sal.treat.x == "low",]$grow.ratio)
+      kd2.36s <- density(dat[dat$TA.treat.x == 2000 
+              & dat$dps == 36 
+              & dat$sal.treat.x == "low"
+              & dat$size == "small",]$grow.ratio)
+      kd2.36m <- density(dat[dat$TA.treat.x == 2000 
+              & dat$dps == 36 
+              & dat$sal.treat.x == "low"
+              & dat$size == "medium",]$grow.ratio)
+      kd2.36l <- density(dat[dat$TA.treat.x == 2000 
+              & dat$dps == 36 
+              & dat$sal.treat.x == "low"
+              & dat$size == "large",]$grow.ratio)
+kd3.36 <- density(dat[dat$TA.treat.x == 3000 & dat$dps == 36 & dat$sal.treat.x == "low",]$grow.ratio)
+      kd3.36s <- density(dat[dat$TA.treat.x == 3000 
+              & dat$dps == 36 
+              & dat$sal.treat.x == "low"
+              & dat$size == "small",]$grow.ratio)
+      kd3.36m <- density(dat[dat$TA.treat.x == 3000 
+              & dat$dps == 36 
+              & dat$sal.treat.x == "low"
+              & dat$size == "medium",]$grow.ratio)
+      kd3.36l <- density(dat[dat$TA.treat.x == 3000 
+              & dat$dps == 36 
+              & dat$sal.treat.x == "low"
+              & dat$size == "large",]$grow.ratio)
+```
+
+EFFECT OF SIZE AND ALKALINITY ON AVERAGE GROWTH RATIO AT DPS = 7, 15, 36
+mean growth ratio within: LOW SALINITY
+        among: SIZE CLASSES + TA LEVELS
+stat test? X
+```{r}
+red <- rgb (1, 0, 0, alpha=0.15) 
+green <- rgb (0, 1, 0, alpha=0.15)
+blue <- rgb (0, 0, 1, alpha=0.15)
+par(mfrow = c(2,2))
+#dps = 7
+      #all sizes
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 7 & dat$sal.treat.x == "low",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "7 dps", main = "all sizes")
+  lines(kd2.7,lwd = 3, col = "red")
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 7 & dat$sal.treat.x == "low",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "7 dps", main = "all sizes", add = T)
+  lines(kd1.7,lwd = 3, col = "goldenrod4")
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 7 & dat$sal.treat.x == "low",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "7 dps", main = "all sizes", add = T)
+  lines(kd3.7,lwd = 3, col = "blue")
+  #takeaways: means look similar in all cases
+  
+      #small
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 7 & dat$sal.treat.x == "low" & dat$size == "small",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "7 dps", main = "small")
+  lines(kd2.7s,lwd = 3, col = "red")
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 7 & dat$sal.treat.x == "low"& dat$size == "small",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "7 dps", main = "all sizes", add = T)
+  lines(kd1.7s,lwd = 3, col = "goldenrod4")
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 7 & dat$sal.treat.x == "low"& dat$size == "small",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "7 dps", main = "all sizes", add = T)
+  lines(kd3.7s,lwd = 3, col = "blue")
+  
+      #medium
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 7 & dat$sal.treat.x == "low" & dat$size == "medium",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,12), col=red, probability=T, xlab = "7 dps", main = "medium")
+  lines(kd2.7m,lwd = 3, col = "red")
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 7 & dat$sal.treat.x == "low"& dat$size == "medium",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "7 dps", main = "all sizes", add = T)
+  lines(kd1.7m,lwd = 3, col = "goldenrod4")
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 7 & dat$sal.treat.x == "low"& dat$size == "medium",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "7 dps", main = "all sizes", add = T)
+  lines(kd3.7m,lwd = 3, col = "blue")
+  
+      #large
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 7 & dat$sal.treat.x == "low" & dat$size == "large",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "7 dps", main = "large")
+  lines(kd2.7l,lwd = 3, col = "red")
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 7 & dat$sal.treat.x == "low"& dat$size == "large",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "7 dps", main = "all sizes", add = T)
+  lines(kd1.7l,lwd = 3, col = "goldenrod4")
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 7 & dat$sal.treat.x == "low"& dat$size == "large",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "7 dps", main = "all sizes", add = T)
+  lines(kd3.7l,lwd = 3, col = "blue")
+
+#dps = 15
+      #all sizes
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 15 & dat$sal.treat.x == "low",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "15 dps", main = "all sizes")
+  lines(kd2.15,lwd = 3, col = "red")
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 15 & dat$sal.treat.x == "low",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "15 dps", main = "all sizes", add = T)
+  lines(kd1.15,lwd = 3, col = "goldenrod4")
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 15 & dat$sal.treat.x == "low",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "15 dps", main = "all sizes", add = T)
+  lines(kd3.15,lwd = 3, col = "blue")
+  #takeaways: 
+  
+      #small
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 15 & dat$sal.treat.x == "low" & dat$size == "small",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "15 dps", main = "small")
+  lines(kd2.15s,lwd = 3, col = "red")
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 15 & dat$sal.treat.x == "low"& dat$size == "small",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "15 dps", main = "all sizes", add = T)
+  lines(kd1.15s,lwd = 3, col = "goldenrod4")
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 15 & dat$sal.treat.x == "low"& dat$size == "small",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "15 dps", main = "all sizes", add = T)
+  lines(kd3.15s,lwd = 3, col = "blue")
+  
+      #medium
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 15 & dat$sal.treat.x == "low" & dat$size == "medium",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,12), col=red, probability=T, xlab = "15 dps", main = "medium")
+  lines(kd2.15m,lwd = 3, col = "red")
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 15 & dat$sal.treat.x == "low"& dat$size == "medium",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "15 dps", main = "all sizes", add = T)
+  lines(kd1.15m,lwd = 3, col = "goldenrod4")
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 15 & dat$sal.treat.x == "low"& dat$size == "medium",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "15 dps", main = "all sizes", add = T)
+  lines(kd3.15m,lwd = 3, col = "blue")
+  
+      #large
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 15 & dat$sal.treat.x == "low" & dat$size == "large",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "15 dps", main = "large")
+  lines(kd2.15l,lwd = 3, col = "red")
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 15 & dat$sal.treat.x == "low"& dat$size == "large",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "15 dps", main = "all sizes", add = T)
+  lines(kd1.15l,lwd = 3, col = "goldenrod4")
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 15 & dat$sal.treat.x == "low"& dat$size == "large",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "15 dps", main = "all sizes", add = T)
+  lines(kd3.15l,lwd = 3, col = "blue")
+
+
+#dps = 36
+      #all sizes
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 36 & dat$sal.treat.x == "low",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "36 dps", main = "all sizes")
+  lines(kd2.36,lwd = 3, col = "red")
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 36 & dat$sal.treat.x == "low",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "36 dps", main = "all sizes", add = T)
+  lines(kd1.36,lwd = 3, col = "goldenrod4")
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 36 & dat$sal.treat.x == "low",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "36 dps", main = "all sizes", add = T)
+  lines(kd3.36,lwd = 3, col = "blue")
+  
+      #small
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 36 & dat$sal.treat.x == "low" & dat$size == "small",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "36 dps", main = "small")
+  lines(kd2.36s,lwd = 3, col = "red")
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 36 & dat$sal.treat.x == "low"& dat$size == "small",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "36 dps", main = "all sizes", add = T)
+  lines(kd1.36s,lwd = 3, col = "goldenrod4")
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 36 & dat$sal.treat.x == "low"& dat$size == "small",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "36 dps", main = "all sizes", add = T)
+  lines(kd3.36s,lwd = 3, col = "blue")
+  
+      #medium
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 36 & dat$sal.treat.x == "low" & dat$size == "medium",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,12), col=red, probability=T, xlab = "36 dps", main = "medium")
+  lines(kd2.36m,lwd = 3, col = "red")
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 36 & dat$sal.treat.x == "low"& dat$size == "medium",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "36 dps", main = "all sizes", add = T)
+  lines(kd1.36m,lwd = 3, col = "goldenrod4")
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 36 & dat$sal.treat.x == "low"& dat$size == "medium",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "36 dps", main = "all sizes", add = T)
+  lines(kd3.36m,lwd = 3, col = "blue")
+  
+      #large
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 36 & dat$sal.treat.x == "low" & dat$size == "large",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "36 dps", main = "large")
+  lines(kd2.36l,lwd = 3, col = "red")
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 36 & dat$sal.treat.x == "low"& dat$size == "large",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "36 dps", main = "all sizes", add = T)
+  lines(kd1.36l,lwd = 3, col = "goldenrod4")
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 36 & dat$sal.treat.x == "low"& dat$size == "large",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "36 dps", main = "all sizes", add = T)
+  lines(kd3.36l,lwd = 3, col = "blue")
+```
+
+EFFECT OF TIME ON GROWTH RATIO (ACCLIMATION DIFFERENCES) WITHIN EACH TREATMENT GROUP
+mean growth ratio within: TREATMENT GROUP (TA/S) + SIZE
+                  #across time: 7 VS 15 VS 36 DPS
+stat test? X
+```{r}
+#all sizes:
+par(mfrow = c(3,1))
+#mid TA_ all sizes
+hist(dat[dat$TA.treat.x == 2000 & dat$dps == 7 & dat$sal.treat.x == "low",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "7, 15, 36 dps", main = "all sizes")
+  lines(kd2.7,lwd = 3, col = "red1", lty = 1)
+  hist(dat[dat$TA.treat.x == 2000 & dat$dps == 15 & dat$sal.treat.x == "low",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "15 dps", main = "all sizes", add = T)
+  lines(kd2.15,lwd = 3, col = "red3", lty = 2)
+  hist(dat[dat$TA.treat.x == 2000 & dat$dps == 36 & dat$sal.treat.x == "low",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=red, probability=T, xlab = "36 dps", main = "all sizes", add = T)
+  lines(kd2.36,lwd = 3, col = "red4", lty = 3)
+
+#low TA_ all sizes
+hist(dat[dat$TA.treat.x == 1000 & dat$dps == 7 & dat$sal.treat.x == "low",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "7 dps", main = "all sizes")
+  lines(kd1.7,lwd = 3, col = "goldenrod1", lty = 1)
+  hist(dat[dat$TA.treat.x == 1000 & dat$dps == 15 & dat$sal.treat.x == "low",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "15 dps", main = "all sizes", add = T)
+  lines(kd1.15,lwd = 3, col = "goldenrod3", lty = 2)
+  hist(dat[dat$TA.treat.x == 1000 & dat$dps == 36 & dat$sal.treat.x == "low",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=green, probability=T, xlab = "36 dps", main = "all sizes", add = T)
+  lines(kd1.36,lwd = 3, col = "goldenrod4", lty = 3)
+  
+#high TA_ all sizes
+hist(dat[dat$TA.treat.x == 3000 & dat$dps == 7 & dat$sal.treat.x == "low",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "7 dps", main = "all sizes")
+  lines(kd3.7,lwd = 3, col = "blue1", lty = 1)
+  hist(dat[dat$TA.treat.x == 3000 & dat$dps == 15 & dat$sal.treat.x == "low",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "15 dps", main = "all sizes", add = T)
+  lines(kd3.15,lwd = 3, col = "blue3", lty = 2)
+  hist(dat[dat$TA.treat.x == 3000 & dat$dps == 36 & dat$sal.treat.x == "low",]$grow.ratio, xlim=c(0.6,1.8), ylim=c(0,10), col=blue, probability=T, xlab = "36 dps", main = "all sizes", add = T)
+  lines(kd3.36,lwd = 3, col = "blue4", lty = 3)
+
+  
+#binned by TA and size (looks at the acclimation differences?)
+par(mfrow = c(1,3))
+  #low small
+  plot(kd1.7s, ylim = c(0,8), lwd = 2, xlim = c(0.7,1.5),col = "goldenrod1", main = "Low S: small size, low TA")
+  lines(kd1.15s, lty = 2, lwd = 2,col = "goldenrod3")
+  lines(kd1.36s, lty = 3, lwd = 2,col = "goldenrod4")
+  
+  #low medium
+  plot(kd1.7m, ylim = c(0,8), lty = 1, lwd = 2, xlim = c(0.7,1.5),col = "goldenrod1", main = "Low S: medium size, low TA")
+  lines(kd1.15m, lty = 2, lwd = 2,col = "goldenrod3")
+  lines(kd1.36m, lty = 3, lwd = 2,col = "goldenrod4")
+  
+  #low large
+  plot(kd1.7l, ylim = c(0,8), lty = 1, lwd = 2, xlim = c(0.7,1.5),col = "goldenrod1", main = "Low S: large size, low TA")
+  lines(kd1.15l, lty = 2, lwd = 2,col = "goldenrod3")
+  lines(kd1.36l, lty = 3, lwd = 2,col = "goldenrod4")
+  
+   #mid small
+  plot(kd2.7s, ylim = c(0,6.5), lty = 1, lwd = 2, xlim = c(0.7,1.5),col = "red1", main = "Low S: small size, mod TA")
+  lines(kd2.15s, lty = 2, lwd = 2,col = "red3")
+  lines(kd2.36s, lty = 3, lwd = 2,col = "red4")
+  
+  #mid medium
+  plot(kd2.7m, ylim = c(0,12), lty = 1, lwd = 2, xlim = c(0.7,1.5),col = "red1", main = "Low S: medium size, mod TA")
+  lines(kd2.15m, lty = 2, lwd = 2,col = "red3")
+  lines(kd2.36m, lty = 3, lwd = 2,col = "red4")
+  
+  #mid large
+  plot(kd2.7l, ylim = c(0,10), lty = 1, lwd = 2, xlim = c(0.7,1.5),col = "red1", main = "Low S: large size, mod TA")
+  lines(kd2.15, lty = 2, lwd = 2,col = "red3")
+  lines(kd2.36l, lty = 3, lwd = 2,col = "red4")
+  
+  #high small
+  plot(kd3.7s, ylim = c(0,8), lty = 1, lwd = 2, xlim = c(0.7,1.5),col = "blue1", main = "Low S: small size, high TA")
+  lines(kd3.15s, lty = 2, lwd = 2,col = "blue3")
+  lines(kd3.36s, lty = 3, lwd = 2,col = "blue4")
+  
+  #high medium
+  plot(kd3.7m, ylim = c(0,6), lty = 1, lwd = 2, xlim = c(0.7,1.5),col = "blue1", main = "Low S: medium size, high TA")
+  lines(kd3.15m, lty = 2, lwd = 2,col = "blue3")
+  lines(kd3.36m, lty = 3, lwd = 2,col = "blue4")
+  
+  #high large
+  plot(kd3.7l, ylim = c(0,6), lty = 1, lwd = 2, xlim = c(0.7,1.5),col = "blue1", main = "Low S: large size, high TA")
+  lines(kd3.15l, lty = 2, lwd = 2,col = "blue3")
+  lines(kd3.36l, lty = 3, lwd = 2,col = "blue4")
+
+```
+
+--------------other things--------------------------
+looking at organic content
+```{r}
+boxplot(dat[dat$sal.treat.x == "low",]$`%oc.ic.shell` ~ dat[dat$sal.treat.x == "low",]$TA.treat.x)
+plot(dat[dat$sal.treat.x == "low",]$`%oc.ic.shell` ~ dat[dat$sal.treat.x == "low",]$med.pH)
+ANOVA1<-aov(`%oc.ic.shell`~as.factor(TA.treat.x),data=dat[dat$sal.treat.x == "low",])
+summary(ANOVA1)
+TukeyHSD(ANOVA1)
+
+boxplot(dat[dat$sal.treat.x == "amb",]$`%oc.ic.shell` ~ dat[dat$sal.treat.x == "amb",]$TA.treat.x)
+plot(dat[dat$sal.treat.x == "amb",]$`%oc.ic.shell` ~ dat[dat$sal.treat.x == "amb",]$med.pH)
+ANOVA2<-aov(`%oc.ic.shell`~as.factor(TA.treat.x),data=dat[dat$sal.treat.x == "amb",])
+summary(ANOVA2)
+TukeyHSD(ANOVA2)
+
+boxplot(dat$`%oc.ic.shell` ~ dat$med.ta, pch = 19)
+
+plot(dat[dat$sal.treat.x == "amb",]$`%oc.ic.shell` ~ log(dat[dat$sal.treat.x == "amb",]$SA.mm2), pch = 19, col = as.factor(dat[dat$sal.treat.x == "amb",]$TA.treat.x), bty = "n", type = "n")
+  points(dat[dat$sal.treat.x == "amb" & dat$TA.treat.x == 1000 & dat$dps == 36,]$`%oc.ic.shell` ~ log(dat[dat$sal.treat.x == "amb"& dat$TA.treat.x == 1000& dat$dps == 36,]$SA.mm2), pch = 21, bg = "goldenrod1", cex = 1.15)
+  points(dat[dat$sal.treat.x == "amb" & dat$TA.treat.x == 2000 & dat$dps == 36,]$`%oc.ic.shell` ~ log(dat[dat$sal.treat.x == "amb"& dat$TA.treat.x == 2000& dat$dps == 36,]$SA.mm2), pch = 21, bg = "red1", cex = 1.15)
+  points(dat[dat$sal.treat.x == "amb" & dat$TA.treat.x == 3000 & dat$dps == 36,]$`%oc.ic.shell` ~ log(dat[dat$sal.treat.x == "amb"& dat$TA.treat.x == 3000& dat$dps == 36,]$SA.mm2), pch = 21, bg = "blue1", cex = 1.15)
+
+plot(dat[dat$sal.treat.x == "low",]$`%oc.ic.shell` ~ log(dat[dat$sal.treat.x == "low",]$SA.mm2), pch = 19, col = as.factor(dat[dat$sal.treat.x == "low",]$TA.treat.x), bty = "n", type = "n")
+  points(dat[dat$sal.treat.x == "low" & dat$TA.treat.x == 1000 & dat$dps == 36,]$`%oc.ic.shell` ~ log(dat[dat$sal.treat.x == "low"& dat$TA.treat.x == 1000& dat$dps == 36,]$SA.mm2), pch = 21, bg = "goldenrod", cex = 1.15)
+  points(dat[dat$sal.treat.x == "low" & dat$TA.treat.x == 2000 & dat$dps == 36,]$`%oc.ic.shell` ~ log(dat[dat$sal.treat.x == "low"& dat$TA.treat.x == 2000& dat$dps == 36,]$SA.mm2), pch = 21, bg = "red3", cex = 1.15)
+  points(dat[dat$sal.treat.x == "low" & dat$TA.treat.x == 3000 & dat$dps == 36,]$`%oc.ic.shell` ~ log(dat[dat$sal.treat.x == "low"& dat$TA.treat.x == 3000& dat$dps == 36,]$SA.mm2), pch = 21, bg = "blue4", cex = 1.15)
+    
+plot(dat[dat$sal.treat.x == "amb",]$`%oc.ic.shell` ~ log(dat[dat$sal.treat.x == "amb",]$shell.wt), pch = 19, col = as.factor(dat[dat$sal.treat.x == "amb",]$TA.treat.x), bty = "n", type = "n")
+  points(dat[dat$sal.treat.x == "amb" & dat$TA.treat.x == 1000,]$`%oc.ic.shell` ~ log(dat[dat$sal.treat.x == "amb"& dat$TA.treat.x == 1000,]$shell.wt), pch = 21, bg = "goldenrod", cex = 1.15)
+    points(dat[dat$sal.treat.x == "amb" & dat$TA.treat.x == 2000,]$`%oc.ic.shell` ~ log(dat[dat$sal.treat.x == "amb"& dat$TA.treat.x == 2000,]$shell.wt), pch = 21, bg = "red3", cex = 1.15)
+      points(dat[dat$sal.treat.x == "amb" & dat$TA.treat.x == 3000,]$`%oc.ic.shell` ~ log(dat[dat$sal.treat.x == "amb"& dat$TA.treat.x == 3000,]$shell.wt), pch = 21, bg = "blue4", cex = 1.15)
+
+plot(dat[dat$sal.treat.x == "amb",]$`%oc.ic.shell` ~ log(dat[dat$sal.treat.x == "amb",]$shell.wt), pch = 19, col = as.factor(dat[dat$sal.treat.x == "amb",]$TA.treat.x), bty = "n", type = "n")
+  points(dat[dat$sal.treat.x == "amb" & dat$TA.treat.x == 1000,]$`%oc.ic.shell` ~ log(dat[dat$sal.treat.x == "amb"& dat$TA.treat.x == 1000,]$shell.wt), pch = 21, bg = "goldenrod", cex = 1.15)
+    points(dat[dat$sal.treat.x == "amb" & dat$TA.treat.x == 2000,]$`%oc.ic.shell` ~ log(dat[dat$sal.treat.x == "amb"& dat$TA.treat.x == 2000,]$shell.wt), pch = 21, bg = "red3", cex = 1.15)
+      points(dat[dat$sal.treat.x == "amb" & dat$TA.treat.x == 3000,]$`%oc.ic.shell` ~ log(dat[dat$sal.treat.x == "amb"& dat$TA.treat.x == 3000,]$shell.wt), pch = 21, bg = "blue4", cex = 1.15)
+      
+      
+
+
+    mL.1000 <- drm(`%oc.ic.shell` ~ shell.wt, data = dat[dat$sal.treat.x == "low" & dat$TA.treat.x == 1000,], fct = LL.3()) 
+        mL.2000 <- drm(`%oc.ic.shell` ~ shell.wt, data = dat[dat$sal.treat.x == "low" & dat$TA.treat.x == 2000,], fct = LL.3()) 
+            mL.3000 <- drm(`%oc.ic.shell` ~ shell.wt, data = dat[dat$sal.treat.x == "low" & dat$TA.treat.x == 3000,], fct = LL.3()) 
+
+    mH.1000 <- drm(`%oc.ic.shell` ~ shell.wt, data = dat[dat$sal.treat.x == "amb" & dat$TA.treat.x == 1000,], fct = LL.3()) 
+        mH.2000 <- drm(`%oc.ic.shell` ~ shell.wt, data = dat[dat$sal.treat.x == "amb" & dat$TA.treat.x == 2000,], fct = LL.3()) 
+            mH.3000 <- drm(`%oc.ic.shell` ~ shell.wt, data = dat[dat$sal.treat.x == "amb" & dat$TA.treat.x == 3000,], fct = LL.3()) 
+    
+      
+plot(mL.1000, pch = 19, col = "goldenrod2", lwd = 3, cex = .5)
+  plot(mL.2000, pch = 19, col = "red3", add = T, lwd = 3, cex = .5)
+  plot(mL.3000, pch = 19, col = "blue4", add = T, lwd = 3, cex = .5)
+  
+plot(mH.1000, pch = 19, col = "goldenrod2", lwd = 3, cex = .5)
+  plot(mH.2000, pch = 19, col = "red3", add = T, lwd = 3, cex = .5)
+  plot(mH.3000, pch = 19, col = "blue4", add = T, lwd = 3, cex = .5)
+      
+  
+#color spectra
+n=10
+rbPal = colorRampPalette(c("gold1", "purple4"))
+
+par(mfrow = c(1,1))
+col.oc = rbPal(6)[as.numeric(cut(dat$`%oc.ic.shell`, breaks = c(0,1,1.1429,1.3071,1.4754,1.75,2.4584)))]
+plot(jitter(dat[dat$sal.treat.x == "low",]$med.ta,600) ~ jitter(dat[dat$sal.treat.x == "low",]$med.pH,10), pch = 21, bg = col.oc, cex = .75)
+
+plot(jitter(dat[dat$sal.treat.x == "amb",]$med.ta,600) ~ jitter(dat[dat$sal.treat.x == "amb",]$med.pH,10), pch = 21, bg = col.oc, cex = 1)
+
+#density kernals for percent organic matter? 
+plot(dat$`%oc.ic.shell` ~ dat$shell.wt)
+plot(dat$`%oc.ic.shell` ~ dat$gut.wt)
+kdp1 <- density(dat[dat$Plate.x == 1,]$`%oc.ic.shell`)
+kdp2 <- density(dat[dat$Plate.x == 2,]$`%oc.ic.shell`)
+kdp3 <- density(dat[dat$Plate.x == 3,]$`%oc.ic.shell`)
+kdp4 <- density(dat[dat$Plate.x == 4,]$`%oc.ic.shell`)
+kdp5 <- density(dat[dat$Plate.x == 5,]$`%oc.ic.shell`)
+kdp6 <- density(dat[dat$Plate.x == 6,]$`%oc.ic.shell`)
+kdp8 <- density(dat[dat$Plate.x == 8,]$`%oc.ic.shell`)
+kdp9 <- density(dat[dat$Plate.x == 9,]$`%oc.ic.shell`)
+kdp10 <- density(dat[dat$Plate.x == 10,]$`%oc.ic.shell`)
+kdp11 <- density(dat[dat$Plate.x == 11,]$`%oc.ic.shell`)
+kdp12 <- density(dat[dat$Plate.x == 12,]$`%oc.ic.shell`)
+kdp7 <- density(dat[dat$Plate.x == 7,]$`%oc.ic.shell`)
+
+hist(dat[dat$Plate.x == 1,]$`%oc.ic.shell`, probability = T, ylim = c(0,3), xlim = c(0,2.5))
+lines(kdp1)
+hist(dat[dat$Plate.x == 2,]$`%oc.ic.shell`, probability = T, ylim = c(0,3), xlim = c(0,2.5))
+  lines(kdp2)
+  hist(dat[dat$Plate.x == 3,]$`%oc.ic.shell`, probability = T, ylim = c(0,3), xlim = c(0,2.5))
+  lines(kdp3)
+  hist(dat[dat$Plate.x == 4,]$`%oc.ic.shell`, probability = T, ylim = c(0,3), xlim = c(0,2.5))
+  lines(kdp4)
+  hist(dat[dat$Plate.x == 5,]$`%oc.ic.shell`, probability = T, ylim = c(0,3), xlim = c(0,2.5))
+  lines(kdp5)
+  hist(dat[dat$Plate.x == 6,]$`%oc.ic.shell`, probability = T, ylim = c(0,3), xlim = c(0,2.5))
+  lines(kdp6)
+    hist(dat[dat$Plate.x == 8,]$`%oc.ic.shell`, probability = T, ylim = c(0,3), xlim = c(0,2.5))
+  lines(kdp8)
+    hist(dat[dat$Plate.x == 9,]$`%oc.ic.shell`, probability = T, ylim = c(0,3), xlim = c(0,2.5))
+  lines(kdp9)
+    hist(dat[dat$Plate.x == 10,]$`%oc.ic.shell`, probability = T, ylim = c(0,3), xlim = c(0,2.5))
+  lines(kdp10)
+    hist(dat[dat$Plate.x == 11,]$`%oc.ic.shell`, probability = T, ylim = c(0,3), xlim = c(0,2.5))
+  lines(kdp11)
+    hist(dat[dat$Plate.x == 12,]$`%oc.ic.shell`, probability = T, ylim = c(0,3), xlim = c(0,2.5))
+  lines(kdp12)
+    hist(dat[dat$Plate.x == 7,]$`%oc.ic.shell`, probability = T, ylim = c(0,3), xlim = c(0,2.5))
+  lines(kdp7)
+  
+mod.tuk = (lm(dat$`%oc.ic.shell` ~ as.factor(dat$sal.treat.x) + dat$med.pH + dat$med.ta))
+summary(mod.tuk)
+
+dat$Plate.x <- as.factor(dat$Plate.x)
+iris.aov <- (aov(`%oc.ic.shell` ~ Plate.x, data = dat))
+iris.tukey <- glht(iris.aov, linfct = mcp(Plate.x = "Tukey"))
+cld(iris.tukey)
+
+plot(TukeyHSD(mod.tuk, conf.level=.95, order = T), las = 2)
+
+boxplot(dat$`%oc.ic.shell` ~ dat$Plate.x, group = TRUE)
+```
+
+looking at condition index
+```{r}
+boxplot(dat$CI ~ dat$Plate.x, pch = 19)
+iris.aov <- (lm(CI ~ med.ta + med.S + med.pH, data = dat[dat$dps == 36,]))
+
+lm1 <- (lm(`%oc.ic.shell` ~ med.ta + med.S , data = dat[dat$dps == 36,]))
+summary(lm1) #TA and S
+
+lm2 <- (lm(CI ~ med.ta + med.S , data = dat[dat$dps == 36,]))
+summary(lm2) #only S
+
+#color spectra
+n=10
+rbPal = colorRampPalette(c("gold1", "purple4"))
+par(mfrow = c(1,1))
+col.ta = rbPal(6)[as.numeric(cut(dat[dat$dps == 36,]$med.ta, breaks = 5))]
+plot(dat[dat$dps == 36,]$med.ta, pch = 19, col = col.ta)
+plot(dat[dat$dps == 36,]$`%oc.ic.shell` ~ log(dat[dat$dps == 36,]$SA.mm2), bg = "black", pch = 21, ylim = c(0.5,2), cex = 1.2)
+summary(lm(dat[dat$dps == 36,]$`%oc.ic.shell` ~ log(dat[dat$dps == 36,]$SA.mm2)))
+abline(0.27465,0.20787, lty = 1, lwd = 4, col = "black")
+  points(dat[dat$dps == 36 & dat$SA.start < 100,]$`%oc.ic.shell` ~ log(dat[dat$dps == 36& dat$SA.start < 100,]$SA.mm2), bg = "pink3", cex = 1.2, pch = 21)
+    points(dat[dat$dps == 36 & dat$SA.start > 200,]$`%oc.ic.shell` ~ log(dat[dat$dps == 36& dat$SA.start > 200,]$SA.mm2), bg = "red4", cex = 1.2, pch = 21)
+      points(dat[dat$dps == 36 & dat$SA.start > 100  & dat$SA.start < 200,]$`%oc.ic.shell` ~ log(dat[dat$dps == 36& dat$SA.start > 100  & dat$SA.start < 200,]$SA.mm2), bg = "salmon", cex = 1.2, pch = 21)
+      
+boxplot(dat[dat$dps == 36,]$`%oc.ic.shell` ~ (dat[dat$dps == 36,]$size))
+
+abline(v=4.60517)
+abline(v=5.298317)
+
+
+summary(lm(dat[dat$dps == 36,]$`%oc.ic.shell` ~ log(dat[dat$dps == 36,]$SA.mm2) + dat[dat$dps == 36,]$size))
+abline(0.27465,(0.20787+4.638e-05), lty = 2, lwd = 3, col = "green")
+
+
+
+```
+  
+_____________________________________old code_____________
+```{r}
+for(x15 in unique(dat$CV_ID)){
+  new = as.data.frame(dat[dat$dps == 15,]$SA.mm2)
+    }
+new$SA.dps15 <- new$`dat[dat$dps == 15, ]$SA.mm2`
+new$CV_ID <- sort(unique(dat[dat$dps == 15,]$CV_ID))
+
+dat1 = merge(dat,new,by = "CV_ID")
+dat1$mm2.d.dps15.36 = dat1$SA.mm2-dat1$SA.dps15/11
+dat1$mm2.d.dps1.7 = dat1$SA.mm2 - dat1$SA.start/7
+dat1$mm2.d.dps1.15 = dat1$SA.mm2 - dat1$SA.start/15
+
+boxplot(dat1[dat1$dps == 36,]$mm2.d.dps15.36 ~ dat1[dat1$dps == 36,]$TA.treat.x + dat1[dat1$dps == 36,]$sal.treat.x)
+boxplot(dat1[dat1$dps == 7,]$mm2.d.dps1.7 ~ dat1[dat1$dps == 7,]$TA.treat.x + dat1[dat1$dps == 7,]$sal.treat.x)
+boxplot(dat1[dat1$dps == 15,]$mm2.d.dps1.15 ~ dat1[dat1$dps == 15,]$TA.treat.x + dat1[dat1$dps == 15,]$sal.treat.x)
+
+plot(dat1[dat1$dps == 36,]$gro.rat.day.15 ~ dat1[dat1$dps == 36,]$grow.ratio, pch = 19, col = as.factor(dat1[dat1$dps == 15,]$TA.treat.x))
 abline(0,1)
 
-plot(new$diff.perc ~ new$med.ta, col = as.factor(new$sal.treat), pch = 19)
-new = new[new$code == 0,]
+
+```
+
+
+
+testing whether a distribution has changed over time
+```{r}
+
+
+
+
 
 plot(new$shell.wt ~ new$end, pch = 19, col = as.factor(new$sal.treat))
 plot(new$orgC.shell.wt ~ new$med.ta, pch = 19, col = as.factor(new$TA.treat))
@@ -289,61 +1622,3 @@ abline(h=0)# values above 0 mean that growth rate increased after acclim and any
 plot(new$delta.rates ~ new$med.ta, pch = 19, col = as.factor(new$sal.treat))
 
 ```
-
-looking at energy allocation diff from control change
-```{r}
-#pre condition averages
-pre = gro.full[gro.full$Plate == "pre",]
-pre.shell = mean(pre$shell.wt)
-pre.gut = mean(pre$gut.wt)
-pre.CI = mean(pre$CI)
-pre.orgC = mean(pre$orgC.shell.wt)
-pre.percOC = mean(pre$`%oc.ic.shell`)
-
-#post condition averages
-post = gro.full[gro.full$Plate == "post",]
-post.shell = mean(post$shell.wt)
-post.gut = mean(post$gut.wt)
-post.CI = mean(post$CI)
-post.orgC = mean(post$orgC.shell.wt)
-post.percOC = mean(post$`%oc.ic.shell`)
-
-#difference from beginning
-a = post.percOC - pre.percOC
-b = post.CI - pre.CI
-
-gro$org.perc.diff = gro$`%oc.ic.shell` - pre.percOC #pos values = higher organic content in shell, neg values = lower organic content in shell
-
-gro$CI.diff = gro$CI - pre.CI #pos values = higher CI after, neg values = lower CI after
-
-summary(aov(gro$org.perc.diff ~ gro$med.S + gro$med.ta))
-summary(aov(gro$CI.diff ~ gro$med.S + gro$med.ta))
-
-
-
-```
-
-looking at shell properties
-```{r}
-```
-
-
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
-```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
