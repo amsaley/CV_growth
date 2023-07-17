@@ -12,7 +12,7 @@ library(readxl)
 library(lme4)
 library(lmerTest)
 sw = read_xlsx("treatment monitoring.xlsx")
-mass = read_xlsx("CV mass data.xlsx") 
+mass = read_xlsx("CV mass data_V1.xlsx") 
   mass = mass[mass$CV_ID != "bucket 4" & mass$CV_ID != "bucket 6",]
   mass$CI = mass$gut.wt/mass$shell.wt
   mass$bucket = as.numeric(mass$`Bucket#`)
@@ -22,7 +22,7 @@ mass = read_xlsx("CV mass data.xlsx")
   #3 = ID missing for CV
   #4 = bad data
   mass = mass[mass$code == 0,]
-sa = read_xlsx("all SA growth data.xlsx")
+sa = read_xlsx("all SA growth data_V1.xlsx")
 
   
 ```
@@ -100,7 +100,11 @@ sa.proc = subset(sa, sa$CV_ID != 581 &
                    sa$CV_ID != 549 & 
                    sa$CV_ID != 544 & 
                    sa$CV_ID != 541 &
-                   sa$CV_ID != 537 & 
+                   sa$CV_ID != 537 &
+                    sa$CV_ID != 526 &
+                    sa$CV_ID != 536 &
+                   sa$CV_ID != 534 &
+                    sa$CV_ID != 538 &
                    sa$CV_ID != 530 & 
                    sa$CV_ID != 517 & 
                    sa$CV_ID != 514 & 
@@ -164,36 +168,684 @@ sa.proc = subset(sa, sa$CV_ID != 581 &
 calculating growth rate from time step to time step; new df as growth_rate from sa.proc
 ```{r}
 library(dplyr)
+sa.proc = sa.proc[sa.proc$dps == 0 | sa.proc$dps == 15 | sa.proc$dps == 36,]
 
 growth_rate = sa.proc %>%
   # first sort by year
   group_by(CV_ID) %>%
   mutate(Diff_time = date.numb - lag(date.numb),  # Difference in time (just in case there are gaps)
          Diff_growth = SA.mm2 - lag(SA.mm2), # Difference in route between years
-         Rate_percent = (Diff_growth / Diff_time)/SA.mm2 * 100)# growth rate in percent 
+         Net_growth = SA.mm2 - SA.start,
+         incr_growth = (Diff_growth/Diff_time)# growth rate in percent 
+         )
+
 ```
 merging the growth + treatments + mass into one data frame; new df to use from here = dat
 ```{r}
 full = merge(growth_rate, mass, by = "CV_ID")
-full = full[,-c(9,17:20,24)] #removing the redundant columns
-#dat = full[full$TA.treat.x == "1000" | full$TA.treat.x == "3000",]
-dat = full
+dat = full[full$SA.start < 250 & full$Net_growth > -15 & full$`%oc.ic.shell` > 0,]
+dat$TA.treat.x = as.factor(dat$TA.treat.x)
 ```
+
+what is the effect of S on growth?
+```{r}
+#creating a df with just amb TA and just low TA
+amb = dat[dat$med.ta>1800 & dat$med.ta<2300,]
+low = dat[dat$med.ta < 1000,]
+
+#at ambient TA, low S individuals had higher overall growth
+end = amb[amb$dps == 36,]
+mod = aov(Net_growth ~ factor(med.S), data=end, na.action=na.omit)#using med.S so that I can not have bucket at a grouping variable?
+summary(mod)
+
+
+boxplot(amb[amb$dps == 36,]$Net_growth ~ amb[amb$dps == 36,]$TA.treat.x, pch = 19, ylab = NA, xlab = NA, names= NA, ylim = c(-20,60), frame.plot = F, xlim = c(0,4), axes = F, col = "grey40")
+lines(x= c(1,4), y=c(-20,-20), lwd = 2)
+lines(x= c(1,1), y=c(-20,60), lwd = 2)
+axis(side = 1, line = -1, tick = F, at = c(2,3), labels = c("Ambient","Reduced"), cex.axis = 1.25)
+axis(side = 1, line = .5, tick = F, at = 2.5, labels = "Salinity Level", cex.axis = 1.25)
+axis(side = 2, line = -7.5, tick = F, at = c(-20,-10,0,10,20,30,40,50,60), labels = c("-20","-10","0","10","20","30","40","50","60"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = -5.75, tick = F, at = 20, labels = expression(paste('Net surface area growth (mm'^2,')')), cex.axis = 1.25)
+
+boxplot(amb[amb$dps == 15,]$Net_growth ~ amb[amb$dps == 15,]$TA.treat.x, pch = 19, ylab = NA, xlab = NA, names= NA, ylim = c(-20,70), frame.plot = F, xlim = c(0,4), axes = F, col = "grey")
+lines(x= c(1,4), y=c(-20,-20), lwd = 2)
+lines(x= c(1,1), y=c(-20,60), lwd = 2)
+axis(side = 1, line = -1, tick = F, at = c(2,3), labels = c("Ambient","Reduced"), cex.axis = 1.25)
+axis(side = 1, line = .5, tick = F, at = 2.5, labels = "Salinity Level", cex.axis = 1.25)
+axis(side = 2, line = -7.5, tick = F, at = c(-20,-10,0,10,20,30,40,50,60), labels = c("-20","-10","0","10","20","30","40","50","60"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = -5.75, tick = F, at = 20, labels = expression(paste('Net surface area growth (mm'^2,')')), cex.axis = 1.25)
+
+```
+what is the effect of TA on growth?
+```{r}
+amb.S = dat[dat$sal.treat.x == "amb",]
+
+#after 5 weeks of exposure
+end = amb.S[amb.S$dps == 36,]
+mod = aov(Net_growth ~ factor(TA.treat.x), data=end, na.action=na.omit)
+TukeyHSD(mod, factor("end$TA.treat.x"))
+plot(TukeyHSD(mod, factor("end$TA.treat.x")))
+
+boxplot(amb.S[amb.S$dps == 36,]$Net_growth ~ amb.S[amb.S$dps == 36,]$TA.treat.x, pch = 19, ylab = NA, xlab = NA, names= NA, ylim = c(-20,60), frame.plot = F, xlim = c(0,4), axes = F, col = "grey40")
+lines(x= c(0,4), y=c(-20,-20), lwd = 2)
+lines(x= c(0,0), y=c(-20,60), lwd = 2)
+axis(side = 1, line = -1, tick = F, at = c(1,2,3), labels = c("reduced","moderate","elevated"), cex.axis = 1.25)
+axis(side = 1, line = .5, tick = F, at = 2, labels = "Alkalinity Level", cex.axis = 1.25)
+axis(side = 2, line = -1.5, tick = F, at = c(-20,-10,0,10,20,30,40,50,60), labels = c("-20","-10","0","10","20","30","40","50","60"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = .25, tick = F, at = 20, labels = expression(paste('Net surface area growth (mm'^2,')')), cex.axis = 1.25)
+
+
+#plot(amb.S[amb.S$dps == 36,]$Net_growth ~ jitter(amb.S[amb.S$dps == 36,]$med.ta,20), pch = 19)
+#summary(lm(amb.S[amb.S$dps == 36,]$Net_growth ~ amb.S[amb.S$dps == 36,]$med.ta))
+#abline(5.6961422,0.0025330, lwd = 3)
+
+```
+what is the effect of TA under low S conditions?
+```{r}
+low.S = dat[dat$sal.treat.x == "low",]
+
+#after 5 weeks of exposure
+boxplot(low.S[low.S$dps == 36,]$Net_growth ~ low.S[low.S$dps == 36,]$TA.treat.x, pch = 19, ylab = NA, xlab = NA, names= NA, ylim = c(-20,60), frame.plot = F, xlim = c(0,4), axes = F, col = "grey40")
+lines(x= c(0,4), y=c(-20,-20), lwd = 2)
+lines(x= c(0,0), y=c(-20,60), lwd = 2)
+axis(side = 1, line = -1, tick = F, at = c(1,2,3), labels = c("Rain","low TA","high TA"), cex.axis = 1.25)
+axis(side = 1, line = .5, tick = F, at = 2, labels = "Simulated FW source", cex.axis = 1.25)
+axis(side = 2, line = -1.5, tick = F, at = c(-20,-10,0,10,20,30,40,50,60), labels = c("-20","-10","0","10","20","30","40","50","60"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = .25, tick = F, at = 20, labels = expression(paste('Net surface area growth (mm'^2,')')), cex.axis = 1.25)
+end = low.S[low.S$dps == 36,]
+mod = aov(Net_growth ~ factor(TA.treat.x), data=end, na.action=na.omit)
+TukeyHSD(mod, factor("end$TA.treat.x"))
+plot(TukeyHSD(mod, factor("end$TA.treat.x")))
+
+```
+do the effects of TA and S appear as 'shock effects' (ie they disappear after two weeks) or do they persist? need to look at incremental growth here...
+```{r}
+dat = dat[dat$dps != 0,]
+#amb salinity
+amb.S = amb.S[amb.S$dps != 0,]
+#incremental growth rates decline in amb TA conditions, suggesting that maybe the effect of altered
+boxplot(amb.S$incr_growth ~ amb.S$dps : amb.S$TA.treat.x, pch = 19, ylab = NA, xlab = NA, col = unique(c("grey","grey40")), names= NA, ylim = c(-1.5,3.5), frame.plot = F, xlim = c(0,9), axes = F)
+text(x = 8, y = 2.8, labels = c("Exposure period"), cex = 1.25)
+legend(x=6.6,y=2.8,fill = c("grey","grey40"),legend = c("days 0-15","days 15-36"),bty = "n", cex = 1.2, x.intersp=0.4)
+lines(x= c(0,7), y=c(-1.5,-1.5), lwd = 2)
+lines(x= c(0,0), y=c(-1.5,3.5), lwd = 2)
+axis(side = 1, line = -1, tick = F, at = c(1.5,3.5,5.5), labels = c("Reduction","Control","Increase"), cex.axis = 1.25)
+axis(side = 1, line = .25, tick = F, at = 3.5, labels = "Alkalinity Level", cex.axis = 1.25)
+axis(side = 2, line = -1.5, tick = F, at = c(-1,0,1,2,3), labels = c("-1.0","0.0","1.0","2.0","3.0"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = 1.75, tick = F, at = 1, labels = "Surface area growth rate", cex.axis = 1.25)
+axis(side = 2, line = .25, tick = F, at = 1, labels = expression(paste('(mm'^2,' day'^-1,')')), cex.axis = 1.25)
+
+
+low.S = low.S[low.S$dps != 0,]
+boxplot(low.S$incr_growth ~ low.S$dps : low.S$TA.treat.x, pch = 19, ylab = NA, xlab = NA, col = unique(c("grey","grey40")), names= NA, ylim = c(-1.5,4.5), frame.plot = F, xlim = c(0,9), axes = F)
+text(x = 8, y = 2.8, labels = c("Exposure period"), cex = 1.25)
+legend(x=6.6,y=2.8,fill = c("grey","grey40"),legend = c("days 0-15","days 15-36"),bty = "n", cex = 1.2, x.intersp=0.4)
+lines(x= c(0,7), y=c(-1.5,-1.5), lwd = 2)
+lines(x= c(0,0), y=c(-1.5,4.5), lwd = 2)
+axis(side = 1, line = -1, tick = F, at = c(1.5,3.5,5.5), labels = c("Rain","Low TA","High TA"), cex.axis = 1.25)
+axis(side = 1, line = .25, tick = F, at = 3.5, labels = "Simulated FW source", cex.axis = 1.25)
+axis(side = 2, line = -1.5, tick = F, at = c(-1,0,1,2,3,4), labels = c("-1.0","0.0","1.0","2.0","3.0","4.0"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = 1.75, tick = F, at = 1.5, labels = "Surface area growth rate", cex.axis = 1.25)
+axis(side = 2, line = .25, tick = F, at = 1.5, labels = expression(paste('(mm'^2,' day'^-1,')')), cex.axis = 1.25)
+mod = aov(incr_growth ~ factor(TA.treat.x) : factor(dps), data=low.S, na.action=na.omit)
+TukeyHSD(mod, factor("TA.treat.x:dps"))
+plot(TukeyHSD(mod, factor("TA.treat.x:dps")))
+```
+shell properties + CI
+```{r}
+plot(amb[amb$dps == 36,]$SA.mm2 ~ amb[amb$dps == 36,]$gut.wt, pch = 19, col = as.factor(amb[amb$dps == 36,]$sal.treat.x), ylab = "Surface area of shell (mm2)", xlab = "Dry tissue mass (mg)")
+summary(lm(amb[amb$dps == 36,]$SA.mm2 ~ amb[amb$dps == 36,]$gut.wt + factor(amb[amb$dps == 36,]$sal.treat.x)))
+abline(52.8442, 13.2406, col = "black", lwd = 3)
+abline(52.5430+24.0465, 13.2406, col = "red", lwd = 3)
+legend(x = 13, y = 125, legend = c("low", "ambient"), fill = c("red","black"), bty = "n")
+text(x = 14.5, y = 125, labels = "Salinity")
+
+#effect of S
+        #on condition index
+boxplot(amb[amb$dps == 36,]$CI ~ amb[amb$dps == 36,]$sal.treat.x, pch = 19, col = "grey40", ylab = NA, xlab = NA, names= NA, ylim = c(0,0.03), frame.plot = F, xlim = c(0,3), axes = F)
+lines(x= c(0,4), y=c(0,0), lwd = 2)
+lines(x= c(0,0), y=c(0,0.03), lwd = 2)
+axis(side = 1, line = -1, tick = F, at = c(1,2), labels = c("Ambient","Reduced"), cex.axis = 1.25)
+axis(side = 1, line = .5, tick = F, at = 1.5, labels = "Salinity Level", cex.axis = 1.25)
+axis(side = 2, line = -1.75, tick = F, at = c(0,0.0050,0.01,0.015,0.02,0.025,0.03), labels = c("0","0.005","0.01","0.015","0.02","0.025","0.03"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = 1.25, tick = F, at = 0.015, labels = 'Condition index (tissue/shell mass)', cex.axis = 1.25)
+        #on organics in shell
+boxplot(amb[amb$dps == 36,]$`%oc.ic.shell` ~ amb[amb$dps == 36,]$sal.treat.x, pch = 19, col = "grey40", ylab = NA, xlab = NA, names= NA, ylim = c(0.5,2), frame.plot = F, xlim = c(0,3), axes = F)
+lines(x= c(0.25,3), y=c(0.5,0.5), lwd = 2)
+lines(x= c(0.25,0.25), y=c(0.5,2), lwd = 2)
+axis(side = 1, line = -1, tick = F, at = c(1,2), labels = c("Ambient","Reduced"), cex.axis = 1.25)
+axis(side = 1, line = .5, tick = F, at = 1.5, labels = "Salinity Level", cex.axis = 1.25)
+axis(side = 2, line = -3.5, tick = F, at = c(0.5,1,1.5,2), labels = c("0.5","1.0","1.5","2.0"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = 0, tick = F, at = 1.25, labels = 'Organic C in shell', cex.axis = 1.25)
+axis(side = 2, line = -1.25, tick = F, at = 1.25, labels = '(% of total shell mass)', cex.axis = 1.25)
+
+#effect of TA
+        #on condition index
+boxplot(amb.S[amb.S$dps == 36,]$CI ~ amb.S[amb.S$dps == 36,]$TA.treat.x, pch = 19, col = "grey40", ylab = NA, xlab = NA, names= NA, ylim = c(0,0.03), frame.plot = F, xlim = c(0,4), axes = F)
+summary(aov(amb.S[amb.S$dps == 36,]$CI ~ amb.S[amb.S$dps == 36,]$TA.treat.x))
+TukeyHSD(aov(amb.S$CI ~ amb.S$TA.treat.x),"amb.S$TA.treat.x")
+lines(x= c(0,4), y=c(0,0), lwd = 2)
+lines(x= c(0,0), y=c(0,0.03), lwd = 2)
+axis(side = 1, line = -1, tick = F, at = c(1,2,3), labels = c("reduced","ambient","elevated"), cex.axis = 1.25)
+axis(side = 1, line = .5, tick = F, at = 2, labels = "Alkalinity Level", cex.axis = 1.25)
+axis(side = 2, line = -1.75, tick = F, at = c(0,0.0050,0.01,0.015,0.02,0.025,0.03), labels = c("0","0.005","0.01","0.015","0.02","0.025","0.03"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = 1.25, tick = F, at = 0.015, labels = 'Condition index (tissue/shell mass)', cex.axis = 1.25)
+        #on organics in shell
+boxplot(amb.S[amb.S$dps == 36,]$`%oc.ic.shell` ~ amb.S[amb.S$dps == 36,]$TA.treat.x, pch = 19, col = "grey40", ylab = NA, xlab = NA, names= NA, ylim = c(0.5,2), frame.plot = F, xlim = c(0,4), axes = F)
+lines(x= c(0.25,4), y=c(0.5,0.5), lwd = 2)
+lines(x= c(0.25,0.25), y=c(0.5,2), lwd = 2)
+axis(side = 1, line = -1, tick = F, at = c(1,2,3), labels = c("reduced","ambient","elevated"), cex.axis = 1.25)
+axis(side = 1, line = .5, tick = F, at = 2, labels = "Alkalinity Level", cex.axis = 1.25)
+axis(side = 2, line = -3, tick = F, at = c(0.5,1,1.5,2), labels = c("0.5","1.0","1.5","2.0"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = 0, tick = F, at = 1.25, labels = 'Organic C in shell', cex.axis = 1.25)
+axis(side = 2, line = -1.25, tick = F, at = 1.25, labels = '(% of total shell mass)', cex.axis = 1.25)
+
+#effect of TA in simulated freshwater events
+        #on condition index
+boxplot(low.S[low.S$dps == 36,]$CI ~ low.S[low.S$dps == 36,]$TA.treat.x, pch = 19, col = "grey40", ylab = NA, xlab = NA, names= NA, ylim = c(0,0.03), frame.plot = F, xlim = c(0,4), axes = F)
+summary(aov(low.S[low.S$dps == 36,]$CI ~ factor(low.S[low.S$dps == 36,]$TA.treat.x)))
+TukeyHSD(aov(low.S$CI ~ low.S$TA.treat.x),"low.S$TA.treat.x")
+lines(x= c(0,4), y=c(0,0), lwd = 2)
+lines(x= c(0,0), y=c(0,0.03), lwd = 2)
+axis(side = 1, line = -1, tick = F, at = c(1,2,3), labels = c("rain","low TA","high TA"), cex.axis = 1.25)
+axis(side = 1, line = .5, tick = F, at = 2, labels = "Alkalinity Level", cex.axis = 1.25)
+axis(side = 2, line = -1.75, tick = F, at = c(0,0.0050,0.01,0.015,0.02,0.025,0.03), labels = c("0","0.005","0.01","0.015","0.02","0.025","0.03"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = 1.25, tick = F, at = 0.015, labels = 'Condition index (tissue/shell mass)', cex.axis = 1.25)
+            #on organics in shell
+boxplot(low.S[low.S$dps == 36,]$`%oc.ic.shell` ~ low.S[low.S$dps == 36,]$TA.treat.x, pch = 19, col = "grey40", ylab = NA, xlab = NA, names= NA, ylim = c(0.5,2), frame.plot = F, xlim = c(0,4), axes = F)
+lines(x= c(0.25,4), y=c(0.5,0.5), lwd = 2)
+lines(x= c(0.25,0.25), y=c(0.5,2), lwd = 2)
+axis(side = 1, line = -1, tick = F, at = c(1,2,3), labels = c("rain","low TA","high TA"), cex.axis = 1.25)
+axis(side = 1, line = .5, tick = F, at = 2, labels = "Simulated FW exposure", cex.axis = 1.25)
+axis(side = 2, line = -3, tick = F, at = c(0.5,1,1.5,2), labels = c("0.5","1.0","1.5","2.0"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = 0, tick = F, at = 1.25, labels = 'Organic C in shell', cex.axis = 1.25)
+axis(side = 2, line = -1.25, tick = F, at = 1.25, labels = '(% of total shell mass)', cex.axis = 1.25)
+```
+looking into what drives the variability?
+```{r}
+plot(amb.S$med.ta ~ amb.S$med.pH)
+
+```
+
+EXTRA CODE BELOW 
+```{r}
+
+#omitting CV ids that DIED off during trial
+sa.proc = subset(sa,sa$CV_ID != 577 & 
+                   sa$CV_ID != 571 &             
+                   sa$CV_ID != 570 &
+                   sa$CV_ID != 564 & 
+                   sa$CV_ID != 561 & 
+                   sa$CV_ID != 544 & 
+                   sa$CV_ID != 537 & 
+                   sa$CV_ID != 530 & 
+                   sa$CV_ID != 514 & 
+                   sa$CV_ID != 479 & 
+                   sa$CV_ID != 462 & 
+                   sa$CV_ID != 459 &
+                   sa$CV_ID != 409 & 
+                   sa$CV_ID != 405 & 
+                   sa$CV_ID != 403 &
+                   sa$CV_ID != 348 &
+                   sa$CV_ID != 337 &
+                   sa$CV_ID != 334 &
+                   sa$CV_ID != 332 & 
+                   sa$CV_ID != 321 &
+                   sa$CV_ID != 317 & 
+                   sa$CV_ID != 313 & 
+                   sa$CV_ID != 311 & 
+                   sa$CV_ID != 305 & 
+                   sa$CV_ID != 299 &
+                   sa$CV_ID != 298 &
+                   sa$CV_ID != 271 & 
+                   sa$CV_ID != 241 & 
+                   sa$CV_ID != 218 & 
+                   sa$CV_ID != 205 &
+                   sa$CV_ID != 192 & 
+                   sa$CV_ID != 146 &
+                   sa$CV_ID != 91 & 
+                   sa$CV_ID != 78 & 
+                   sa$CV_ID != 42 &
+                   sa$CV_ID != 29 & 
+                   sa$CV_ID != 7 & 
+                   sa$CV_ID != 6)
+
+```
+################################################
+
 look at the dat data and correcting for outliers? 
 ```{r}
-plot(dat$grow.ratio ~ dat$SA.start, pch = 19)
-summary(dat$grow.ratio)
-q1 = 1.0
-q3 = 1.1298
+plot(dat$Net_growth ~ dat$SA.start, pch = 19, col = as.factor(dat$TA.treat.x))
+summary(dat[dat$dps != 0,]$Net_growth)
+q1 = 1.092           
+q3 = 15.403        
 iqr = q3-q1
 max = q3 + (1.5*iqr)
-min = 0.01
-plot(dat$grow.ratio, pch = 19)
+min = q1 - (1.5*iqr)
+plot(dat$Net_growth, pch = 19)
 abline(h=c(min,max))
 
-#dat = dat[dat$grow.ratio < max & dat$grow.ratio > min,]
-dat = dat[dat$grow.ratio < 1.5,]
+```
 
+
+looking at growth ratios across time periods
+```{r}
+n=10
+rbPal = colorRampPalette(c("gold1", "purple4"))
+col.inc.grow =rbPal(10)[as.numeric(cut(dat$incr_growth, breaks = 10))]
+col.ta = rbPal(4)[as.numeric(cut(dat$med.ta, breaks = 4))]
+
+da1 = dat[dat$sal.treat.x == "amb",]
+#week 1 - 2; effect of SA and TA; Positive effect of SA and increased growth increments in higher TA levels
+plot(da1[da1$dps == 15,]$incr_growth ~ log(da1[da1$dps == 15,]$SA.mm2), pch = 19, col = rbPal(4)[as.numeric(cut(da1[da1$dps == 15,]$med.ta, breaks = 4))])
+         summary(lm(da1[da1$dps == 12,]$incr_growth ~ log(da1[da1$dps == 12,]$SA.mm2) + da1[da1$dps == 12,]$med.ta))
+
+#week 2 - 3; effect of SA and TA; but now increases in TA result in lower growth increments across size; SA still with a positive relationship
+    plot(da1[da1$dps == 18,]$incr_growth ~ log(da1[da1$dps == 18,]$SA.mm2), pch = 19, col = rbPal(4)[as.numeric(cut(da1[da1$dps == 18,]$med.ta, breaks = 4))])
+summary(lm(da1[da1$dps == 18,]$incr_growth ~ log(da1[da1$dps == 18,]$SA.mm2) + da1[da1$dps == 18,]$med.ta))
+
+#week 4 - 5; no effect of any of size, TA 
+    plot(da1[da1$dps == 36,]$incr_growth ~ log(da1[da1$dps == 36,]$SA.mm2), pch = 19, col = as.factor(da1[da1$dps == 36,]$TA.treat.x))
+         summary(lm(da1[da1$dps == 36,]$incr_growth ~ log(da1[da1$dps == 36,]$SA.mm2) + da1[da1$dps == 36,]$med.ta))
+         
+         #find the week that the effect disappears
+#week 3 - 4; very small positive effect of TA and large effect of SA
+plot(da1[da1$dps == 25,]$incr_growth ~ log(da1[da1$dps == 25,]$SA.mm2), pch = 19, col = as.factor(da1[da1$dps == 25,]$TA.treat.x))
+summary(lm(da1[da1$dps == 25,]$incr_growth ~ log(da1[da1$dps == 25,]$SA.mm2) + da1[da1$dps == 25,]$med.ta))
+
+
+da2 = dat[dat$sal.treat.x == "low",]
+
+#week 1 - 2; effect of SA and TA; both positive; SA much larger effect than TA; similar effect sizes to what is seen in the ambient salinity (intercept values)
+plot(da2[da2$dps == 12,]$incr_growth ~ log(da2[da2$dps == 12,]$SA.mm2), pch = 19, col = as.factor(da2[da2$dps == 12,]$TA.treat.x))
+summary(lm(da2[da2$dps == 12,]$incr_growth ~ log(da2[da2$dps == 12,]$SA.mm2) + da2[da2$dps == 12,]$med.ta))
+
+#week 2 - 3; effect of SA and TA; but now increases in TA result in lower growth increments across size; SA still with a positive relationship; size much stronger effect in the ambient; TA has similar magnitude shift in intercept than ambient
+    plot(da2[da2$dps == 18,]$incr_growth ~ log(da2[da2$dps == 18,]$SA.mm2), pch = 19, col = as.factor(da2[da2$dps == 18,]$TA.treat.x))
+summary(lm(da2[da2$dps == 18,]$incr_growth ~ log(da2[da2$dps == 18,]$SA.mm2) + da2[da2$dps == 18,]$med.ta))
+
+#week 4 - 5; no effect of any of size, TA
+    plot(da2[da2$dps == 36,]$incr_growth ~ log(da2[da2$dps == 36,]$SA.mm2), pch = 19, col = as.factor(da2[da2$dps == 36,]$TA.treat.x))
+         summary(lm(da2[da2$dps == 36,]$incr_growth ~ log(da2[da2$dps == 36,]$SA.mm2) + da2[da2$dps == 36,]$med.ta))
+         
+         #find the week that the effect disappears
+#week 3 - 4; as the TA increases, the intercept for incremental growth goes down and there is no relationship with size. AKA pattern not here either.
+    plot(da2[da2$dps == 25,]$incr_growth ~ log(da2[da2$dps == 25,]$SA.mm2), pch = 19, col = as.factor(da2[da2$dps == 25,]$TA.treat.x))
+    summary(lm(da2[da2$dps == 25,]$incr_growth ~ log(da2[da2$dps == 25,]$SA.mm2) + da2[da2$dps == 25,]$med.ta))
+
+
+```
+
+
+exceedence plots
+```{r}
+write.csv(dat, file = "to create ranking3.csv", row.names = T)
+
+#for each day on each plate, I need R to go through and rank the individual by incremental growth (new col 1) and then divide that number by 1+nrow(plate) (new col 2) and then rank the individual by net growth (new col 3) and then divide that number by 1+nrow(plate) (new col 4)
+
+
+#exc = read.csv("w.prob.est.1539.csv") #each ranking is based on a narrow binning of TA (w/in 50umol)
+exc = read.csv("w.prob.csv") #each ranking is based on a plate (a given set of conditions)
+
+rbPal = colorRampPalette(c("gold1", "purple4"))
+exc$ta.col = rbPal(8)[as.numeric(cut(exc$med.ta, breaks = 8))]
+
+#size probability plots
+unique(exc$dps) # 0 15 36 
+#starting week
+plot(exc$prob.size ~ exc$SA.mm2, type = "n")
+points(exc[exc$dps == 0 & exc$sal.treat.x == "amb",]$prob.size ~ exc[exc$dps == 0& exc$sal.treat.x == "amb",]$SA.mm2, pch = 21, bg = exc$ta.col, xlab = "Surface area (mm2)", ylab = "Probability Estimate") #all of the lines overlapping; that's good. shows that all individuals starting at same size curves
+plot(exc$prob.size ~ exc$SA.mm2, type = "n")
+points(exc[exc$dps == 0 & exc$sal.treat.x == "low",]$prob.size ~ exc[exc$dps == 0& exc$sal.treat.x == "low",]$SA.mm2, pch = 21, bg = exc$ta.col, xlab = "Surface area (mm2)", ylab = "Probability Estimate") #all of the lines overlapping; that's good. shows that all individuals starting at same size curves
+
+#week 2
+plot(exc$prob.size ~ exc$SA.mm2, type = "n")
+points(exc[exc$dps == 15 & exc$sal.treat.x == "amb",]$prob.size ~ exc[exc$dps == 15 & exc$sal.treat.x == "amb",]$SA.mm2, pch = 21, bg = exc$ta.col, xlab = "Surface area (mm2)", ylab = "Probability Estimate") #
+plot(exc$prob.size ~ exc$SA.mm2, type = "n")
+points(exc[exc$dps == 15 & exc$sal.treat.x == "low",]$prob.size ~ exc[exc$dps == 15 & exc$sal.treat.x == "low",]$SA.mm2, pch = 21, bg = exc$ta.col, xlab = "Surface area (mm2)", ylab = "Probability Estimate") #
+
+#week 5
+plot(exc$prob.size ~ exc$SA.mm2, type = "n")
+points(exc[exc$dps == 36 & exc$sal.treat.x == "amb",]$prob.size ~ exc[exc$dps == 36 & exc$sal.treat.x == "amb",]$SA.mm2, pch = 21, bg = exc$ta.col, xlab = "Surface area (mm2)", ylab = "Probability Estimate") #
+points(exc[exc$dps == 36 & exc$sal.treat.x == "low",]$prob.size ~ exc[exc$dps == 36 & exc$sal.treat.x == "low",]$SA.mm2, pch = 21, bg = exc$ta.col, xlab = "Surface area (mm2)", ylab = "Probability Estimate") #
+
+
+#looking at growth rates (incremental between week 2 and week 5)
+#week 2
+plot(exc$prob.growth.inc ~ exc$incr_growth, type = "n")
+points(exc[exc$dps == 15 & exc$sal.treat.x == "amb",]$prob.growth.inc ~ exc[exc$dps == 15 & exc$sal.treat.x == "amb",]$incr_growth, pch = 21, bg = exc$ta.col, xlab = "Incremental growth (mm2/day between day 0 and day 12)", ylab = "Probability Estimate") #at week two, the incremental growth is not impacted by TA
+plot(exc$prob.growth.inc ~ exc$incr_growth, type = "n")
+points(exc[exc$dps == 15 & exc$sal.treat.x == "low",]$prob.growth.inc ~ exc[exc$dps == 15 & exc$sal.treat.x == "low",]$incr_growth, pch = 21, bg = exc$ta.col, xlab = "Incremental growth (mm2/day between day 0 and day 12)", ylab = "Probability Estimate") #at week two, it looks like the high TA has the highest incremental growth
+
+#week 5
+plot(exc$prob.growth.inc ~ exc$incr_growth, type = "n")
+points(exc[exc$dps == 36 & exc$sal.treat.x == "amb",]$prob.growth.inc ~ exc[exc$dps == 36 & exc$sal.treat.x == "amb",]$incr_growth, pch = 21, bg = exc$ta.col, xlab = "Incremental growth (mm2/day between day 12 and day 36)", ylab = "Probability Estimate") #at week five, high TA has the highest incremental growth
+plot(exc$prob.growth.inc ~ exc$incr_growth, type = "n")
+points(exc[exc$dps == 36 & exc$sal.treat.x == "low",]$prob.growth.inc ~ exc[exc$dps == 36 & exc$sal.treat.x == "low",]$incr_growth, pch = 21, bg = exc$ta.col, xlab = "Incremental growth (mm2/day between day 12 and day 36)", ylab = "Probability Estimate") #at week two, it looks like the high TA has the highest incremental growth
+
+
+#looking at growth rates (net growth between 0 - week 2 and 0 - week 5)
+#week 2
+plot(exc$prob.growth.net ~ exc$Net_growth, type = "n")
+points(exc[exc$dps == 15 & exc$sal.treat.x == "amb",]$prob.growth.net ~ exc[exc$dps == 15 & exc$sal.treat.x == "amb",]$Net_growth, pch = 21, bg = exc$ta.col, xlab = "Net growth (mm2/day between day 0 and day 12)", ylab = "Probability Estimate") #at week two, the net growth is not impacted by TA
+plot(exc$prob.growth.net ~ exc$Net_growth, type = "n")
+points(exc[exc$dps == 15 & exc$sal.treat.x == "low",]$prob.growth.net ~ exc[exc$dps == 15 & exc$sal.treat.x == "low",]$Net_growth, pch = 21, bg = exc$ta.col, xlab = "Net growth (mm2/day between day 0 and day 12)", ylab = "Probability Estimate") #at week two, it looks like the high TA has the highest net growth
+
+#week 5
+plot(exc$prob.growth.net ~ exc$Net_growth, type = "n")
+points(exc[exc$dps == 36 & exc$sal.treat.x == "amb",]$prob.growth.net ~ exc[exc$dps == 36 & exc$sal.treat.x == "amb",]$Net_growth, pch = 21, bg = exc$ta.col, xlab = "Net growth (mm2/day between day 12 and day 36)", ylab = "Probability Estimate") #at week five, high TA has the highest incremental growth
+plot(exc$prob.growth.net ~ exc$Net_growth, type = "n")
+points(exc[exc$dps == 36 & exc$sal.treat.x == "low",]$prob.growth.net ~ exc[exc$dps == 36 & exc$sal.treat.x == "low",]$Net_growth, pch = 21, bg = exc$ta.col, xlab = "Net growth (mm2/day between day 12 and day 36)", ylab = "Probability Estimate") #at week two, it looks like the high TA has the highest incremental growth
+```
+
+```{r}
+end = dat[dat$dps == 36,]
+end$TA.treat.x = as.factor(end$TA.treat.x)
+end$og.sa = end$orgC.shell.wt/end$SA.mm2
+end.h = end[end$sal.treat.x == "amb" & end$og.sa < 0.15,]
+end.l = end[end$sal.treat.x == "low"& end$og.sa < 0.15,]
+
+dps.15 = dat[dat$dps == 15,]
+plot(dps.15$incr_growth ~ dps.15$med.ta, col = as.factor(dps.15$sal.treat.x))
+boxplot(dps.15[dps.15$sal.treat.x == "amb",]$incr_growth ~ dps.15[dps.15$sal.treat.x == "amb",]$TA.treat.x)
+boxplot(dps.15[dps.15$sal.treat.x == "low",]$incr_growth ~ dps.15[dps.15$sal.treat.x == "low",]$TA.treat.x)
+                                                
+
+
+#relationship between SA and gut wt; not mod by TA
+#relationship between SA and % organic matter; not mod by TA
+#relationship between gut and % organic matter; not mod by TA
+
+#TA diff in org matter on shell?
+plot(end.h$og.sa ~ jitter(end.h$med.ta,10), pch = 19, ylim = c(0,0.1), xlab = "TA treatment", ylab = "Organic material on shell (mass/SA)")
+summary(lm(end.h$og.sa ~ end.h$med.ta)) #INCREASED ORG WITH INCREASED TA
+abline(2.868e-02,(3.082e-06), lwd = 3)
+
+plot(end.l$og.sa ~ jitter(end.l$med.ta,50), ylim = c(0,0.1), xlab = "TA treatment", ylab = "Organic material on shell (mass/SA)", pch = 19)
+summary(lm(end.l$og.sa ~ end.l$med.ta)) #NO RELATIONSHIP
+
+#TA diff in gut mass?
+plot(end.h$gut.wt ~ end.h$med.ta)
+summary(lm(end.h$gut.wt ~ end.h$med.ta)) #NO RELATIONSHIP
+plot(end.l$gut.wt ~ end.l$med.ta)
+summary(lm(end.l$gut.wt ~ end.l$med.ta)) #NO RELATIONSHIP
+
+#TA diff in net growth
+boxplot(end.h$Net_growth ~ end.h$TA.treat.x, pch = 19)
+plot(end.h$Net_growth ~ jitter(end.h$med.ta,10), pch = 19)
+summary(aov(end.h$Net_growth ~ end.h$TA.treat.x))
+TukeyHSD(aov(end.h$Net_growth ~ end.h$TA.treat.x),"end.h$TA.treat.x")
+
+boxplot(end.l$Net_growth ~ end.l$TA.treat.x, pch = 19)
+plot(end.l$Net_growth ~ jitter(end.l$med.ta,10), pch = 19)
+summary(aov(end.l$Net_growth ~ end.l$TA.treat.x))
+TukeyHSD(aov(end.l$Net_growth ~ end.l$TA.treat.x),"end.l$TA.treat.x")
+
+#TA diff in inc growth
+boxplot(end.h$incr_growth ~ end.h$TA.treat.x, pch = 19)
+plot(end.h$incr_growth ~ jitter(end.h$med.ta,10), pch = 19)
+summary(aov(end.h$incr_growth ~ end.h$TA.treat.x))
+TukeyHSD(aov(end.h$incr_growth ~ end.h$TA.treat.x),"end.h$TA.treat.x")
+
+boxplot(end.l$incr_growth ~ end.l$TA.treat.x, pch = 19)
+plot(end.l$incr_growth ~ jitter(end.l$med.ta,10), pch = 19)
+summary(aov(end.l$incr_growth ~ end.l$TA.treat.x))
+TukeyHSD(aov(end.l$incr_growth ~ end.l$TA.treat.x),"end.l$TA.treat.x")
+
+#week 0-2
+boxplot(exc[exc$sal.treat.x == "amb" & exc$dps == 15,]$incr_growth ~ exc[exc$sal.treat.x == "amb"& exc$dps == 15,]$TA.treat.x, pch = 19)
+plot(exc[exc$sal.treat.x == "amb" & exc$dps == 15,]$incr_growth ~ exc[exc$sal.treat.x == "amb"& exc$dps == 15,]$med.ta, pch = 19)
+summary(lm(exc[exc$sal.treat.x == "amb" & exc$dps == 15,]$incr_growth ~ exc[exc$sal.treat.x == "amb"& exc$dps == 15,]$med.ta)) #no relationship
+summary(aov(exc[exc$sal.treat.x == "amb" & exc$dps == 15,]$incr_growth ~ exc[exc$sal.treat.x == "amb"& exc$dps == 15,]$TA.treat.x))
+
+boxplot(exc[exc$sal.treat.x == "low" & exc$dps == 15,]$incr_growth ~ exc[exc$sal.treat.x == "low"& exc$dps == 15,]$TA.treat.x, pch = 19)
+summary(aov(exc[exc$sal.treat.x == "low" & exc$dps == 15,]$incr_growth ~ exc[exc$sal.treat.x == "low"& exc$dps == 15,]$TA.treat.x))
+plot(exc[exc$sal.treat.x == "low" & exc$dps == 15,]$incr_growth ~ exc[exc$sal.treat.x == "low"& exc$dps == 15,]$med.ta, pch = 19)
+summary(lm(exc[exc$sal.treat.x == "low" & exc$dps == 15,]$incr_growth ~ exc[exc$sal.treat.x == "low"& exc$dps == 15,]$med.ta)) #positive relationship
+
+exc.modTA = exc[exc$med.ta > 1500 & exc$med.ta < 2500,]
+end.modTA = end[end$med.ta > 1500 & end$med.ta < 2500,]
+boxplot(end.modTA$Net_growth ~ end.modTA$sal.treat.x)
+boxplot(end.modTA$incr_growth ~ end.modTA$sal.treat.x)
+boxplot(exc.modTA[exc.modTA$dps == 15,]$Net_growth ~ exc.modTA[exc.modTA$dps == 15,]$sal.treat.x)
+
+```
+
+
+
+
+
+```{r}
+
+
+plot(exc$prob.ig ~ exc$incr_growth, pch = 21, bg = col.ta, type = "n")
+  points(exc[exc$sal.treat.x == "amb" & exc$dps == 39,]$prob.ig ~ exc[exc$sal.treat.x == "amb" &  exc$dps == 39 ,]$incr_growth,  bg = exc[exc$sal.treat.x == "amb" &  exc$dps == 39 ,]$ta.col, pch = 21)
+    points(exc[exc$sal.treat.x == "low" & exc$dps == 39,]$prob.ig ~ exc[exc$sal.treat.x == "low" &  exc$dps == 39 ,]$incr_growth,  bg = exc[exc$sal.treat.x == "amb" &  exc$dps == 39 ,]$ta.col, pch = 21)
+    
+    
+    
+plot(exc$prob.est.ig ~ exc$incr_growth, pch = 21)
+  points(exc[exc$sal.treat.x == "amb" &
+  exc$TA.treat.x == 1000 & exc$dps == 15,]$prob.est.ig ~
+  exc[exc$sal.treat.x == "amb" & exc$TA.treat.x == 1000 & 
+  exc$dps == 15,]$incr_growth,
+  bg = "blue", pch = 21)
+  points(exc[exc$sal.treat.x == "amb" &
+  exc$TA.treat.x == 1000 & exc$dps == 39,]$prob.est.ig ~
+  exc[exc$sal.treat.x == "amb" & exc$TA.treat.x == 1000 & 
+  exc$dps == 39,]$incr_growth,
+  bg = "blue4", pch = 21)
+  
+    points(exc[exc$sal.treat.x == "amb" &
+  exc$TA.treat.x == 2000 & exc$dps == 15,]$prob.est.ig ~
+  exc[exc$sal.treat.x == "amb" & exc$TA.treat.x == 2000 & 
+  exc$dps == 15,]$incr_growth,
+  bg = "yellow", pch = 21)
+  points(exc[exc$sal.treat.x == "amb" &
+  exc$TA.treat.x == 2000 & exc$dps == 39,]$prob.est.ig ~
+  exc[exc$sal.treat.x == "amb" & exc$TA.treat.x == 2000 & 
+  exc$dps == 39,]$incr_growth,
+  bg = "yellow4", pch = 21)
+  
+    points(exc[exc$sal.treat.x == "amb" &
+  exc$TA.treat.x == 3000 & exc$dps == 15,]$prob.est.ig ~
+  exc[exc$sal.treat.x == "amb" & exc$TA.treat.x == 3000 & 
+  exc$dps == 15,]$incr_growth,
+  bg = "purple", pch = 21)
+  points(exc[exc$sal.treat.x == "amb" &
+  exc$TA.treat.x == 3000 & exc$dps == 39,]$prob.est.ig ~
+  exc[exc$sal.treat.x == "amb" & exc$TA.treat.x == 3000 & 
+  exc$dps == 39,]$incr_growth,
+  bg = "purple4", pch = 21)
+  
+  
+#to compare each of the curves
+  # high TA, amb S has the curve most shifted to the right; indicating that the incremental growth rates are higher overall than in other TA treatments between week 1 and 2 of the trial
+  # high TA, amb S also shows the largest shift to the left among the TA treatments; indicating that it showed the largest decline in incremental growth rate with time
+  # mid TA, amb S has a consistent incremental growth rate over time, which makes sense because this treatment was the one closest to what they were experiencing in ambient conditions prior to the assay
+  # low TA, amb S has a similar curve to high TA at day 36, however, the curve at day 12 seems to be the flattest, crossing all of the curves at this time point
+  
+plot(exc$prob.est.ig ~ exc$incr_growth, pch = 21, type = "n")
+  points(exc[exc$sal.treat.x == "low" &
+  exc$TA.treat.x == 1000 & exc$dps == 12,]$prob.est.ig ~
+  exc[exc$sal.treat.x == "low" & exc$TA.treat.x == 1000 & 
+  exc$dps == 12,]$incr_growth,
+  bg = "blue", pch = 21)
+  points(exc[exc$sal.treat.x == "low" &
+  exc$TA.treat.x == 1000 & exc$dps == 36,]$prob.est.ig ~
+  exc[exc$sal.treat.x == "low" & exc$TA.treat.x == 1000 & 
+  exc$dps == 36,]$incr_growth,
+  bg = "blue4", pch = 21)
+  
+    points(exc[exc$sal.treat.x == "low" &
+  exc$TA.treat.x == 2000 & exc$dps == 12,]$prob.est.ig ~
+  exc[exc$sal.treat.x == "low" & exc$TA.treat.x == 2000 & 
+  exc$dps == 12,]$incr_growth,
+  bg = "yellow", pch = 21)
+  points(exc[exc$sal.treat.x == "low" &
+  exc$TA.treat.x == 2000 & exc$dps == 36,]$prob.est.ig ~
+  exc[exc$sal.treat.x == "low" & exc$TA.treat.x == 2000 & 
+  exc$dps == 36,]$incr_growth,
+  bg = "yellow4", pch = 21)
+  
+    points(exc[exc$sal.treat.x == "low" &
+  exc$TA.treat.x == 3000 & exc$dps == 12,]$prob.est.ig ~
+  exc[exc$sal.treat.x == "low" & exc$TA.treat.x == 3000 & 
+  exc$dps == 12,]$incr_growth,
+  bg = "purple", pch = 21)
+  points(exc[exc$sal.treat.x == "low" &
+  exc$TA.treat.x == 3000 & exc$dps == 36,]$prob.est.ig ~
+  exc[exc$sal.treat.x == "low" & exc$TA.treat.x == 3000 & 
+  exc$dps == 36,]$incr_growth,
+  bg = "purple4", pch = 21)
+  
+n=10
+rbPal = colorRampPalette(c("gold1", "purple4"))
+col.ta =rbPal(10)[as.numeric(cut(exc$med.ta, breaks = 10))]
+plot(exc$prob.est.ig ~ exc$incr_growth, pch = 21, type = "n")
+points(exc[exc$sal.treat.x == "amb" & exc$dps == 12,]$prob.est.ig ~ exc[exc$sal.treat.x == "amb"& exc$dps == 12,]$incr_growth, bg = col.ta, pch = 21)
+
+points(exc[exc$sal.treat.x == "low" & exc$dps == 12,]$prob.est.ig ~ exc[exc$sal.treat.x == "low"& exc$dps == 12,]$incr_growth, bg = col.ta, pch = 21)
+
+points(exc[exc$sal.treat.x == "amb" & exc$dps == 36,]$prob.est.ig ~ exc[exc$sal.treat.x == "amb"& exc$dps == 36,]$incr_growth, bg = col.ta, pch = 22)
+
+points(exc[exc$sal.treat.x == "low" & exc$dps == 36,]$prob.est.ig ~ exc[exc$sal.treat.x == "low"& exc$dps == 36,]$incr_growth, bg = col.ta, pch = 22)
+  #--Voila!  You have your probability curves (probability that a given growth measurement is less than a particular value).
+
+#now looking at the trends for net growth across treatments? 
+
+plot(exc$prob.est.ng ~ exc$net.grow, pch = 21, type = "n")
+  points(exc[exc$sal.treat.x == "amb" &
+  exc$TA.treat.x == 1000 & exc$dps == 12,]$prob.est.ng ~
+  exc[exc$sal.treat.x == "amb" & exc$TA.treat.x == 1000 & 
+  exc$dps == 12,]$net.grow,
+  bg = "blue", pch = 21)
+  points(exc[exc$sal.treat.x == "amb" &
+  exc$TA.treat.x == 1000 & exc$dps == 36,]$prob.est.ng ~
+  exc[exc$sal.treat.x == "amb" & exc$TA.treat.x == 1000 & 
+  exc$dps == 36,]$net.grow,
+  bg = "blue4", pch = 21)
+  
+    points(exc[exc$sal.treat.x == "amb" &
+  exc$TA.treat.x == 2000 & exc$dps == 12,]$prob.est.ng ~
+  exc[exc$sal.treat.x == "amb" & exc$TA.treat.x == 2000 & 
+  exc$dps == 12,]$net.grow,
+  bg = "yellow", pch = 21)
+  points(exc[exc$sal.treat.x == "amb" &
+  exc$TA.treat.x == 2000 & exc$dps == 36,]$prob.est.ng ~
+  exc[exc$sal.treat.x == "amb" & exc$TA.treat.x == 2000 & 
+  exc$dps == 36,]$net.grow,
+  bg = "yellow4", pch = 21)
+  
+    points(exc[exc$sal.treat.x == "amb" &
+  exc$TA.treat.x == 3000 & exc$dps == 12,]$prob.est.ng ~
+  exc[exc$sal.treat.x == "amb" & exc$TA.treat.x == 3000 & 
+  exc$dps == 12,]$net.grow,
+  bg = "purple", pch = 21)
+  points(exc[exc$sal.treat.x == "amb" &
+  exc$TA.treat.x == 3000 & exc$dps == 36,]$prob.est.ng ~
+  exc[exc$sal.treat.x == "amb" & exc$TA.treat.x == 3000 & 
+  exc$dps == 36,]$net.grow,
+  bg = "purple4", pch = 21)
+  
+  
+plot(exc$prob.est.ng ~ exc$net.grow, pch = 21, type = "n")
+  points(exc[exc$sal.treat.x == "low" &
+  exc$TA.treat.x == 1000 & exc$dps == 12,]$prob.est.ng ~
+  exc[exc$sal.treat.x == "low" & exc$TA.treat.x == 1000 & 
+  exc$dps == 12,]$net.grow,
+  bg = "blue", pch = 21)
+  points(exc[exc$sal.treat.x == "low" &
+  exc$TA.treat.x == 1000 & exc$dps == 36,]$prob.est.ng ~
+  exc[exc$sal.treat.x == "low" & exc$TA.treat.x == 1000 & 
+  exc$dps == 36,]$net.grow,
+  bg = "blue4", pch = 21)
+  
+    points(exc[exc$sal.treat.x == "low" &
+  exc$TA.treat.x == 2000 & exc$dps == 12,]$prob.est.ng ~
+  exc[exc$sal.treat.x == "low" & exc$TA.treat.x == 2000 & 
+  exc$dps == 12,]$net.grow,
+  bg = "yellow", pch = 21)
+  points(exc[exc$sal.treat.x == "low" &
+  exc$TA.treat.x == 2000 & exc$dps == 36,]$prob.est.ng ~
+  exc[exc$sal.treat.x == "low" & exc$TA.treat.x == 2000 & 
+  exc$dps == 36,]$net.grow,
+  bg = "yellow4", pch = 21)
+  
+    points(exc[exc$sal.treat.x == "low" &
+  exc$TA.treat.x == 3000 & exc$dps == 12,]$prob.est.ng ~
+  exc[exc$sal.treat.x == "low" & exc$TA.treat.x == 3000 & 
+  exc$dps == 12,]$net.grow,
+  bg = "purple", pch = 21)
+  points(exc[exc$sal.treat.x == "low" &
+  exc$TA.treat.x == 3000 & exc$dps == 36,]$prob.est.ng ~
+  exc[exc$sal.treat.x == "low" & exc$TA.treat.x == 3000 & 
+  exc$dps == 36,]$net.grow,
+  bg = "purple4", pch = 21)
+  
+n=10
+rbPal = colorRampPalette(c("gold1", "purple4"))
+col.ta =rbPal(10)[as.numeric(cut(exc$med.ta, breaks = 10))]
+plot(exc$prob.est.ng ~ exc$net.grow, pch = 21, type = "n")
+points(exc[exc$sal.treat.x == "amb" & exc$dps == 12,]$prob.est.ng ~ exc[exc$sal.treat.x == "amb"& exc$dps == 12,]$net.grow, bg = col.ta, pch = 21)
+
+points(exc[exc$sal.treat.x == "low" & exc$dps == 12,]$prob.est.ng ~ exc[exc$sal.treat.x == "low"& exc$dps == 12,]$net.grow, bg = col.ta, pch = 21)
+
+points(exc[exc$sal.treat.x == "amb" & exc$dps == 36,]$prob.est.ng ~ exc[exc$sal.treat.x == "amb"& exc$dps == 36,]$net.grow, bg = col.ta, pch = 21)
+
+points(exc[exc$sal.treat.x == "low" & exc$dps == 36,]$prob.est.ng ~ exc[exc$sal.treat.x == "low"& exc$dps == 36,]$net.grow, bg = col.ta, pch = 21)
+  #--Voila!  You have your probability curves (probability that a given growth measurement is less than a particular value).
+
+plot(exc$prob.est.ig ~ exc$incr_growth, pch = 21, type = "n")
+
+points(exc[exc$dps == 12,]$prob.est.ig ~ exc[exc$dps == 12,]$incr_growth, bg = col.ta, pch = 21)
+
+points(exc[exc$sal.treat.x == "amb" & exc$dps == 12,]$prob.est.ig ~ exc[exc$sal.treat.x == "amb"& exc$dps == 12,]$incr_growth, bg = "black", pch = 22)
+
+points(exc[exc$dps == 36,]$prob.est.ig ~ exc[exc$dps == 36,]$incr_growth, bg = col.ta, pch = 21)
+
+points(exc[exc$sal.treat.x == "amb" & exc$dps == 36,]$prob.est.ig ~ exc[exc$sal.treat.x == "amb"& exc$dps == 36,]$incr_growth, bg = "black", pch = 22)
+
+
+plot(ex$prob.est.ig ~ ex$incr_growth, pch = 21, type = "n")
+points(ex[ex$dps == 12,]$prob.est.ig ~ ex[ex$dps == 12,]$incr_growth, pch = 21)
+
+points(ex[ex$dps == 36,]$prob.est.ig ~ ex[ex$dps == 36,]$incr_growth, pch = 21)
+
+points(ex[ex$dps == 15,]$prob.est.ig ~ ex[ex$dps == 15,]$incr_growth, pch = 21)
+
+points(ex[ex$dps == 39,]$prob.est.ig ~ ex[ex$dps == 39,]$incr_growth, pch = 21)
+
+
+#incremental growth jumps back and forth between net growth and net dissolution...this is interesting...
+plot(exc$prob.est.ig ~ exc$incr_growth, pch = 21, type = "n")
+points(exc[exc$dps == 7,]$prob.est.ig ~ exc[exc$dps == 7,]$incr_growth, pch = 21, bg = col.ta)
+
+points(exc[exc$dps == 12,]$prob.est.ig ~ exc[exc$dps == 12,]$incr_growth, pch = 21, bg = col.ta)
+
+points(exc[exc$dps == 15,]$prob.est.ig ~ exc[exc$dps == 15,]$incr_growth, pch = 21, bg = col.ta)
+
+points(ex[ex$dps == 36,]$prob.est.ig ~ ex[ex$dps == 36,]$incr_growth, pch = 21, bg = col.ta)
+
+points(ex[ex$dps == 39,]$prob.est.ig ~ ex[ex$dps == 39,]$incr_growth, pch = 21, bg = col.ta)
+
+#now just looking at end of 7 days, 12 days, and 39 days of exposure in separate salinities
+plot(exc[exc$sal.treat.x == "amb",]$prob.est.ig ~ exc[exc$sal.treat.x == "amb",]$incr_growth, pch = 21, type = "n")
+points(exc[exc$dps == 7 & exc$sal.treat.x == "amb",]$prob.est.ig ~ exc[exc$dps == 7 & exc$sal.treat.x == "amb",]$incr_growth, pch = 21, bg = col.ta)
+points(exc[exc$dps == 12 & exc$sal.treat.x == "amb",]$prob.est.ig ~ exc[exc$dps == 12 & exc$sal.treat.x == "amb",]$incr_growth, pch = 21, bg = col.ta)
+points(exc[exc$dps == 39 & exc$sal.treat.x == "amb",]$prob.est.ig ~ exc[exc$dps == 39 & exc$sal.treat.x == "amb",]$incr_growth, pch = 21, bg = col.ta)
+
+plot(exc[exc$sal.treat.x == "low",]$prob.est.ig ~ exc[exc$sal.treat.x == "low",]$incr_growth, pch = 21, type = "n")
+points(exc[exc$dps == 7 & exc$sal.treat.x == "low",]$prob.est.ig ~ exc[exc$dps == 7 & exc$sal.treat.x == "low",]$incr_growth, pch = 21, bg = col.ta)
+points(exc[exc$dps == 12 & exc$sal.treat.x == "low",]$prob.est.ig ~ exc[exc$dps == 12 & exc$sal.treat.x == "low",]$incr_growth, pch = 21, bg = col.ta)
+points(exc[exc$dps == 39 & exc$sal.treat.x == "low",]$prob.est.ig ~ exc[exc$dps == 39 & exc$sal.treat.x == "low",]$incr_growth, pch = 21, bg = col.ta)
+
+
+summary(lm(dat[dat$sal.treat.x == "amb",]$grow.ratio ~ log(dat[dat$sal.treat.x == "amb",]$dps) + log(dat[dat$sal.treat.x == "amb",]$med.ta)))
+# the output says: there is an increase in the growth ratio and it looks like a saturating curve. however, the curve does not differ between TA levels in ambient salinity
+
+summary(lm(dat[dat$sal.treat.x == "low",]$grow.ratio ~ log(dat[dat$sal.treat.x == "low",]$dps) + log(dat[dat$sal.treat.x == "low",]$med.ta)))
+# the output says: there is an increase in the growth ratio and it looks like a saturating curve. Also, that as the TA increases, so does the growth ratio
 ```
 
 creating new columns for grouping by time, and treatment combo...also creating new subsetting df for each time stamp we are interested in
@@ -1622,3 +2274,6 @@ abline(h=0)# values above 0 mean that growth rate increased after acclim and any
 plot(new$delta.rates ~ new$med.ta, pch = 19, col = as.factor(new$sal.treat))
 
 ```
+
+
+
