@@ -187,36 +187,7 @@ dat = full[full$SA.start < 250 & full$Net_growth > -15 & full$`%oc.ic.shell` > 0
 dat$TA.treat.x = as.factor(dat$TA.treat.x)
 ```
 
-what is the effect of S on growth?
-```{r}
-#creating a df with just amb TA and just low TA
-amb = dat[dat$med.ta>1800 & dat$med.ta<2300,]
-low = dat[dat$med.ta < 1000,]
-
-#at ambient TA, low S individuals had higher overall growth
-end = amb[amb$dps == 36,]
-mod = aov(Net_growth ~ factor(med.S), data=end, na.action=na.omit)#using med.S so that I can not have bucket at a grouping variable?
-summary(mod)
-
-
-boxplot(amb[amb$dps == 36,]$Net_growth ~ amb[amb$dps == 36,]$TA.treat.x, pch = 19, ylab = NA, xlab = NA, names= NA, ylim = c(-20,60), frame.plot = F, xlim = c(0,4), axes = F, col = "grey40")
-lines(x= c(1,4), y=c(-20,-20), lwd = 2)
-lines(x= c(1,1), y=c(-20,60), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(2,3), labels = c("Ambient","Reduced"), cex.axis = 1.25)
-axis(side = 1, line = .5, tick = F, at = 2.5, labels = "Salinity Level", cex.axis = 1.25)
-axis(side = 2, line = -7.5, tick = F, at = c(-20,-10,0,10,20,30,40,50,60), labels = c("-20","-10","0","10","20","30","40","50","60"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = -5.75, tick = F, at = 20, labels = expression(paste('Net surface area growth (mm'^2,')')), cex.axis = 1.25)
-
-boxplot(amb[amb$dps == 15,]$Net_growth ~ amb[amb$dps == 15,]$TA.treat.x, pch = 19, ylab = NA, xlab = NA, names= NA, ylim = c(-20,70), frame.plot = F, xlim = c(0,4), axes = F, col = "grey")
-lines(x= c(1,4), y=c(-20,-20), lwd = 2)
-lines(x= c(1,1), y=c(-20,60), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(2,3), labels = c("Ambient","Reduced"), cex.axis = 1.25)
-axis(side = 1, line = .5, tick = F, at = 2.5, labels = "Salinity Level", cex.axis = 1.25)
-axis(side = 2, line = -7.5, tick = F, at = c(-20,-10,0,10,20,30,40,50,60), labels = c("-20","-10","0","10","20","30","40","50","60"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = -5.75, tick = F, at = 20, labels = expression(paste('Net surface area growth (mm'^2,')')), cex.axis = 1.25)
-
-```
-what is the effect of TA on growth?
+what is the effect of TA on growth rate?
 ```{r}
 amb.S = dat[dat$sal.treat.x == "amb",]
 
@@ -226,18 +197,20 @@ mod = aov(Net_growth ~ factor(TA.treat.x), data=end, na.action=na.omit)
 TukeyHSD(mod, factor("end$TA.treat.x"))
 plot(TukeyHSD(mod, factor("end$TA.treat.x")))
 
-boxplot(amb.S[amb.S$dps == 36,]$Net_growth ~ amb.S[amb.S$dps == 36,]$TA.treat.x, pch = 19, ylab = NA, xlab = NA, names= NA, ylim = c(-20,60), frame.plot = F, xlim = c(0,4), axes = F, col = "grey40")
-lines(x= c(0,4), y=c(-20,-20), lwd = 2)
-lines(x= c(0,0), y=c(-20,60), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(1,2,3), labels = c("reduced","moderate","elevated"), cex.axis = 1.25)
-axis(side = 1, line = .5, tick = F, at = 2, labels = "Alkalinity Level", cex.axis = 1.25)
-axis(side = 2, line = -1.5, tick = F, at = c(-20,-10,0,10,20,30,40,50,60), labels = c("-20","-10","0","10","20","30","40","50","60"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = .25, tick = F, at = 20, labels = expression(paste('Net surface area growth (mm'^2,')')), cex.axis = 1.25)
+boxplot(((amb.S[amb.S$dps == 36,]$Net_growth)/5) ~ amb.S[amb.S$dps == 36,]$TA.treat.x, pch = 19, ylab = NA, xlab = NA, names= NA, ylim = c(-5,15), frame.plot = F, xlim = c(0,4), axes = F)
+lines(x= c(0,4), y=c(-5,-5), lwd = 2)
+lines(x= c(0,0), y=c(-5,15), lwd = 2)
+axis(side = 1, line = -1, tick = F, at = c(1,2,3), labels = c("860","1864","2837"), cex.axis = 1.15)
+axis(side = 1, line = 0.25, tick = F, at = 2, labels = "Median total alkalinity concentration (umol kg -1)", cex.axis = 1.15)
+axis(side = 1, line = 1.25, tick = F, at = c(1,2,3), labels = c("-60%","-17%","+26%"), cex.axis = 0.8)
+axis(side = 1, line = 2, tick = F, at = 2, labels = "Alkalinity change relative to ambient (2250 umol kg-1)", cex.axis = 0.8)
+axis(side = 2, line = -1.5, tick = F, at = c(-5,0,5,10,15), labels = c("-5","0","5", "10", "15"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = 1.25, tick = F, at = 5, labels = 'Net surface area growth rate', cex.axis = 1.15)
+axis(side = 2, line = -0.25, tick = F, at = 5, labels = expression(paste('(mm'^2,' wk'^-1,')')), cex.axis = 1.15)
 
-
-#plot(amb.S[amb.S$dps == 36,]$Net_growth ~ jitter(amb.S[amb.S$dps == 36,]$med.ta,20), pch = 19)
-#summary(lm(amb.S[amb.S$dps == 36,]$Net_growth ~ amb.S[amb.S$dps == 36,]$med.ta))
-#abline(5.6961422,0.0025330, lwd = 3)
+text(x = 1, y = 10, label = "a", cex = 1.15)
+text(x = 2, y = 8, label = "a", cex = 1.15)
+text(x = 3, y = 13, label = "b", cex = 1.15)
 
 ```
 what is the effect of TA under low S conditions?
@@ -245,13 +218,23 @@ what is the effect of TA under low S conditions?
 low.S = dat[dat$sal.treat.x == "low",]
 
 #after 5 weeks of exposure
-boxplot(low.S[low.S$dps == 36,]$Net_growth ~ low.S[low.S$dps == 36,]$TA.treat.x, pch = 19, ylab = NA, xlab = NA, names= NA, ylim = c(-20,60), frame.plot = F, xlim = c(0,4), axes = F, col = "grey40")
-lines(x= c(0,4), y=c(-20,-20), lwd = 2)
-lines(x= c(0,0), y=c(-20,60), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(1,2,3), labels = c("Rain","low TA","high TA"), cex.axis = 1.25)
-axis(side = 1, line = .5, tick = F, at = 2, labels = "Simulated FW source", cex.axis = 1.25)
-axis(side = 2, line = -1.5, tick = F, at = c(-20,-10,0,10,20,30,40,50,60), labels = c("-20","-10","0","10","20","30","40","50","60"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = .25, tick = F, at = 20, labels = expression(paste('Net surface area growth (mm'^2,')')), cex.axis = 1.25)
+boxplot((low.S[low.S$dps == 36,]$Net_growth)/5 ~ low.S[low.S$dps == 36,]$TA.treat.x, pch = 19, ylab = NA, xlab = NA, names= NA, ylim = c(-5,15), frame.plot = F, xlim = c(0,4), axes = F)
+lines(x= c(0,4), y=c(-5,-5), lwd = 2)
+lines(x= c(0,0), y=c(-5,15), lwd = 2)
+
+axis(side = 1, line = -1, tick = F, at = c(1,2,3), labels = c("645","1414","2126"), cex.axis = 1.15)
+axis(side = 1, line = 0.25, tick = F, at = 2, labels = "Median total alkalinity concentration (umol kg -1)", cex.axis = 1.15)
+axis(side = 1, line = 1.25, tick = F, at = c(1,2,3), labels = c("'Rain'","'Low TA river'","'High TA river'"), cex.axis = 0.8)
+axis(side = 1, line = 2, tick = F, at = 2, labels = "Simulated mixing of freshwater source", cex.axis = 0.8)
+axis(side = 2, line = -1.5, tick = F, at = c(-5,0,5,10,15), labels = c("-5","0","5", "10", "15"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = 1.25, tick = F, at = 5, labels = 'Net surface area growth rate', cex.axis = 1.15)
+axis(side = 2, line = -0.25, tick = F, at = 5, labels = expression(paste('(mm'^2,' wk'^-1,')')), cex.axis = 1.15)
+
+text(x = 1, y = 10, label = "a", cex = 1.15)
+text(x = 2, y = 9, label = "a", cex = 1.15)
+text(x = 3, y = 14, label = "b", cex = 1.15)
+
+
 end = low.S[low.S$dps == 36,]
 mod = aov(Net_growth ~ factor(TA.treat.x), data=end, na.action=na.omit)
 TukeyHSD(mod, factor("end$TA.treat.x"))
@@ -291,6 +274,9 @@ mod = aov(incr_growth ~ factor(TA.treat.x) : factor(dps), data=low.S, na.action=
 TukeyHSD(mod, factor("TA.treat.x:dps"))
 plot(TukeyHSD(mod, factor("TA.treat.x:dps")))
 ```
+
+NO EFFECT OF TA OR S (LINEAR) ON CI; see linear model tries for model output.
+
 shell properties + CI
 ```{r}
 plot(amb[amb$dps == 36,]$SA.mm2 ~ amb[amb$dps == 36,]$gut.wt, pch = 19, col = as.factor(amb[amb$dps == 36,]$sal.treat.x), ylab = "Surface area of shell (mm2)", xlab = "Dry tissue mass (mg)")
@@ -366,6 +352,98 @@ looking into what drives the variability?
 plot(amb.S$med.ta ~ amb.S$med.pH)
 
 ```
+
+linear model tries
+```{r}
+
+library(nlme)
+library(lme4)
+library(emmeans)
+
+#transforming the data by making all values positive (adding 27 to the y)
+dat$Net_growth.trans = dat$Net_growth/5 + 20
+dat.36 = as.data.frame(dat[dat$dps == 36,])
+
+mod.full = lme((CI) ~ med.ta + med.S , random = ~1|bucket, data = dat.36, na.action = na.exclude)
+summary(mod.full)
+
+mod.full = lme((Net_growth/5) ~ med.ta + med.S , random = ~1|bucket, data = dat.36, na.action = na.exclude)
+summary(mod.full) #effect of TA only on net growth rate; did not change in lower salinity.
+
+plot(dat.36$Net_growth/5 ~ dat.36$med.ta, col = as.factor(dat.36$sal.treat.x), pch = 19, xlab = NA, ylab = NA, bty = "n", frame.plot = F, axes = F, ylim = c(-5,12), xlim = c(400,3000))
+lines(x= c(400,3500), y=c(-5,-5), lwd = 2)
+lines(x= c(400,400), y=c(-5,15), lwd = 2)
+lines(x= c(2250,2250), y= c(-4.8,15), lwd = 2, lty = 2, col = "grey72")
+axis(side = 1, line = -1, tick = F, at = c(500,1000,1500,2000,2500,3000), labels = c("500","1000","1500","2000","2500","3000"), cex.axis = 1.15)
+axis(side = 1, line = 0.5, tick = F, at = 1750, labels = "Median total alkalinity concentration (umol kg -1)", cex.axis = 1.15)
+points(dat.36[dat.36$sal.treat.x == "amb",]$Net_growth/5 ~ jitter(dat.36[dat.36$sal.treat.x == "amb",]$med.ta,10), col = "black", pch = 19, cex = 1.2)
+points(dat.36[dat.36$sal.treat.x == "low",]$Net_growth/5 ~ jitter(dat.36[dat.36$sal.treat.x == "low",]$med.ta,10), col = "black", pch = 17, cex = 1.2)
+
+axis(side = 2, line = -1.5, tick = F, at = c(-4.2,0.5,5,10,15), labels = c("-5","0","5", "10", "15"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = 1.25, tick = F, at = 2.5, labels = 'Net surface area growth rate', cex.axis = 1.15)
+axis(side = 2, line = -0.25, tick = F, at = 2.5, labels = expression(paste('(mm'^2,' wk'^-1,')')), cex.axis = 1.15)
+
+
+
+#summary(lm((Net_growth/5) ~ med.ta + med.S, data = dat.36))
+
+#abline(0,0.0009965, lwd = 2, col = "black")
+
+
+
+
+
+# histograms of response variable(s); look for gaussian distribution
+
+hist(sqrt(dat.36$Net_growth.trans))
+
+#plot response variable by each of the predictors; look at spread of data
+plot(sqrt(dat.36$Net_growth.trans) ~ (dat.36$med.S), pch = 19)
+plot(sqrt(dat.36$Net_growth.trans) ~ (dat.36$med.ta), pch = 19)
+
+#was pH important to consider? 
+plot(dat.36$med.pH ~ dat.36$med.ta,col = as.factor(dat.36$sal.treat.x), pch = 19, cex = 1.5)
+
+library(seacarb)
+dat.36$om_cal = carb(flag = 8, var1 = dat.36$med.pH, var2 = dat.36$med.ta/(10^6), S = dat.36$med.S, T = 14)$OmegaCalcite
+plot(dat.36$om_cal ~ dat.36$med.ta,col = as.factor(dat.36$sal.treat.x), pch = 19, cex = 1.5)
+
+
+mod.full = lme(log(Net_growth.trans) ~ med.ta + med.S, random = ~1|bucket, data = dat.36, na.action = na.exclude)
+summary(mod.full)
+```
+
+what is the effect of S on growth?
+```{r}
+#creating a df with just amb TA and just low TA
+amb = dat[dat$med.ta>1800 & dat$med.ta<2300,]
+low = dat[dat$med.ta < 1000,]
+
+#at ambient TA, low S individuals had higher overall growth
+end = amb[amb$dps == 36,]
+mod = aov(Net_growth ~ factor(med.S), data=end, na.action=na.omit)#using med.S so that I can not have bucket at a grouping variable?
+summary(mod)
+
+
+boxplot(amb[amb$dps == 36,]$Net_growth ~ amb[amb$dps == 36,]$TA.treat.x, pch = 19, ylab = NA, xlab = NA, names= NA, ylim = c(-20,60), frame.plot = F, xlim = c(0,4), axes = F, col = "grey40")
+lines(x= c(1,4), y=c(-20,-20), lwd = 2)
+lines(x= c(1,1), y=c(-20,60), lwd = 2)
+axis(side = 1, line = -1, tick = F, at = c(2,3), labels = c("Ambient","Reduced"), cex.axis = 1.25)
+axis(side = 1, line = .5, tick = F, at = 2.5, labels = "Salinity Level", cex.axis = 1.25)
+axis(side = 2, line = -7.5, tick = F, at = c(-20,-10,0,10,20,30,40,50,60), labels = c("-20","-10","0","10","20","30","40","50","60"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = -5.75, tick = F, at = 20, labels = expression(paste('Net surface area growth (mm'^2,')')), cex.axis = 1.25)
+
+boxplot(amb[amb$dps == 15,]$Net_growth ~ amb[amb$dps == 15,]$TA.treat.x, pch = 19, ylab = NA, xlab = NA, names= NA, ylim = c(-20,70), frame.plot = F, xlim = c(0,4), axes = F, col = "grey")
+lines(x= c(1,4), y=c(-20,-20), lwd = 2)
+lines(x= c(1,1), y=c(-20,60), lwd = 2)
+axis(side = 1, line = -1, tick = F, at = c(2,3), labels = c("Ambient","Reduced"), cex.axis = 1.25)
+axis(side = 1, line = .5, tick = F, at = 2.5, labels = "Salinity Level", cex.axis = 1.25)
+axis(side = 2, line = -7.5, tick = F, at = c(-20,-10,0,10,20,30,40,50,60), labels = c("-20","-10","0","10","20","30","40","50","60"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = -5.75, tick = F, at = 20, labels = expression(paste('Net surface area growth (mm'^2,')')), cex.axis = 1.25)
+
+```
+
+
 
 EXTRA CODE BELOW 
 ```{r}
