@@ -23,72 +23,307 @@ mass = read_xlsx("CV mass data_V1.xlsx")
   #4 = bad data
   mass = mass[mass$code == 0,]
 sa = read_xlsx("all SA growth data_V1.xlsx")
-
+control = read_xlsx("control cv.xlsx")
+library(seacarb)
   
 ```
+
 seacarb for carbonate system estimates; need to get data from other computer*
 ```{r}
+#inputting another column for salinity
+
+sw$ph.spec = NA
+sw[sw$S > 31,]$ph.spec <- round((0.0221*sw[sw$S > 31,]$pH.mV) + 6.6854,2)
+sw[sw$S < 31,]$ph.spec <- round((0.019*sw[sw$S < 31,]$pH.mV) + 6.7915,2)
+sw$ph.spec = as.numeric(sw$ph.spec)
+
+#calculating the rest of sea carb using TA and pH measurements
+
+carb = carb(flag = 8, var1 = sw$ph.spec, var2 = sw$TA/10^6, T = sw$T_c, S = sw$S)
+
+plot(carb$pH ~ carb$OmegaCalcite)
+
+sw$Om_a = carb(flag = 8, var1 = sw$ph.spec, var2 = sw$TA/10^6, T = sw$T_c, S = sw$S)$OmegaAragonite
+sw$Om_c= carb(flag = 8, var1 = sw$ph.spec, var2 = sw$TA/10^6, T = sw$T_c, S = sw$S)$OmegaCalcite
+sw$DIC= carb(flag = 8, var1 = sw$ph.spec, var2 = sw$TA/10^6, T = sw$T_c, S = sw$S)$DIC
+sw$PCO2= carb(flag = 8, var1 = sw$ph.spec, var2 = sw$TA/10^6, T = sw$T_c, S = sw$S)$PCO2
 
 ```
 calculating median values for sw treatments to apply to the plates (pH, TA, and S); mass.full saved as df
 ```{r}
-#adding a column to gro TA
-mass$med.ta = 0
-mass$med.ta[mass$`Bucket#` == 1] <- median(sw[sw$`Bucket#` == 1& sw$fresh_old == "fresh",]$TA)
-mass$med.ta[mass$`Bucket#` == 2] <- median(sw[sw$`Bucket#` == 2& sw$fresh_old == "fresh",]$TA)
-mass$med.ta[mass$`Bucket#` == 3] <- median(sw[sw$`Bucket#` == 3& sw$fresh_old == "fresh",]$TA)
-mass$med.ta[mass$`Bucket#` == 4] <- median(sw[sw$`Bucket#` == 4& sw$fresh_old == "fresh",]$TA)
-mass$med.ta[mass$`Bucket#` == 5] <- median(sw[sw$`Bucket#` == 5& sw$fresh_old == "fresh",]$TA)
-mass$med.ta[mass$`Bucket#` == 6] <- median(sw[sw$`Bucket#` == 6& sw$fresh_old == "fresh",]$TA)
-mass$med.ta[mass$`Bucket#` == 7] <- median(sw[sw$`Bucket#` == 7& sw$fresh_old == "fresh",]$TA)
-mass$med.ta[mass$`Bucket#` == 8] <- median(sw[sw$`Bucket#` == 8& sw$fresh_old == "fresh",]$TA)
-mass$med.ta[mass$`Bucket#` == 9] <- median(sw[sw$`Bucket#` == 9& sw$fresh_old == "fresh",]$TA)
-mass$med.ta[mass$`Bucket#` == 10] <- median(sw[sw$`Bucket#` == 10& sw$fresh_old == "fresh",]$TA)
-mass$med.ta[mass$`Bucket#` == 11] <- median(sw[sw$`Bucket#` == 11& sw$fresh_old == "fresh",]$TA)
-mass$med.ta[mass$`Bucket#` == 12] <- median(sw[sw$`Bucket#` == 12& sw$fresh_old == "fresh",]$TA)
-mass$med.ta[mass$`Bucket#` == 13] <- median(sw[sw$`Bucket#` == 13& sw$fresh_old == "fresh",]$TA)
-mass$med.ta[mass$`Bucket#` == 14] <- median(sw[sw$`Bucket#` == 14& sw$fresh_old == "fresh",]$TA)
-#adding a column to gro S
-mass$med.S = 0
-mass$med.S[mass$`Bucket#` == 1] <- median(sw[sw$`Bucket#` == 1,]$S)
-mass$med.S[mass$`Bucket#` == 2] <- median(sw[sw$`Bucket#` == 2,]$S)
-mass$med.S[mass$`Bucket#` == 3] <- median(sw[sw$`Bucket#` == 3,]$S)
-mass$med.S[mass$`Bucket#` == 4] <- median(sw[sw$`Bucket#` == 4,]$S)
-mass$med.S[mass$`Bucket#` == 5] <- median(sw[sw$`Bucket#` == 5,]$S)
-mass$med.S[mass$`Bucket#` == 6] <- median(sw[sw$`Bucket#` == 6,]$S)
-mass$med.S[mass$`Bucket#` == 7] <- median(sw[sw$`Bucket#` == 7,]$S)
-mass$med.S[mass$`Bucket#` == 8] <- median(sw[sw$`Bucket#` == 8,]$S)
-mass$med.S[mass$`Bucket#` == 9] <- median(sw[sw$`Bucket#` == 9,]$S)
-mass$med.S[mass$`Bucket#` == 10] <- median(sw[sw$`Bucket#` == 10,]$S)
-mass$med.S[mass$`Bucket#` == 11] <- median(sw[sw$`Bucket#` == 11,]$S)
-mass$med.S[mass$`Bucket#` == 12] <- median(sw[sw$`Bucket#` == 12,]$S)
-mass$med.S[mass$`Bucket#` == 13] <- median(sw[sw$`Bucket#` == 13,]$S)
-mass$med.S[mass$`Bucket#` == 14] <- median(sw[sw$`Bucket#` == 14,]$S)
-#adding a column to gro pH (need to correct value still)
-mass$med.pH = 0
-mass$med.pH[mass$`Bucket#` == 1] <- median(sw[sw$`Bucket#` == 1 & sw$fresh_old == "fresh",]$pH)
-mass$med.pH[mass$`Bucket#` == 2] <- median(sw[sw$`Bucket#` == 2 & sw$fresh_old == "fresh",]$pH)
-mass$med.pH[mass$`Bucket#` == 3] <- median(sw[sw$`Bucket#` == 3 & sw$fresh_old == "fresh",]$pH)
-mass$med.pH[mass$`Bucket#` == 4] <- median(sw[sw$`Bucket#` == 4 & sw$fresh_old == "fresh",]$pH)
-mass$med.pH[mass$`Bucket#` == 5] <- median(sw[sw$`Bucket#` == 5 & sw$fresh_old == "fresh",]$pH)
-mass$med.pH[mass$`Bucket#` == 6] <- median(sw[sw$`Bucket#` == 6 & sw$fresh_old == "fresh",]$pH)
-mass$med.pH[mass$`Bucket#` == 7] <- median(sw[sw$`Bucket#` == 7 & sw$fresh_old == "fresh",]$pH)
-mass$med.pH[mass$`Bucket#` == 8] <- median(sw[sw$`Bucket#` == 8 & sw$fresh_old == "fresh",]$pH)
-mass$med.pH[mass$`Bucket#` == 9] <- median(sw[sw$`Bucket#` == 9 & sw$fresh_old == "fresh",]$pH)
-mass$med.pH[mass$`Bucket#` == 10] <- median(sw[sw$`Bucket#` == 10 & sw$fresh_old == "fresh",]$pH)
-mass$med.pH[mass$`Bucket#` == 11] <- median(sw[sw$`Bucket#` == 11 & sw$fresh_old == "fresh",]$pH)
-mass$med.pH[mass$`Bucket#` == 12] <- median(sw[sw$`Bucket#` == 12 & sw$fresh_old == "fresh",]$pH)
-mass$med.pH[mass$`Bucket#` == 13] <- median(sw[sw$`Bucket#` == 13 & sw$fresh_old == "fresh",]$pH)
-mass$med.pH[mass$`Bucket#` == 14] <- median(sw[sw$`Bucket#` == 14 & sw$fresh_old == "fresh",]$pH)
-mass.full = mass
+
+sw2 = subset(sw, 
+            `Bucket#` != 7 &
+            `Bucket#`!= 14)
+
+sw = sw2
+
+##########Total alkalinity
+
+# Initialize an empty dataframe to store the results
+final_result.TA <- data.frame(Bin = 1:14, med.TA = numeric(14))
+# Iterate over each Bin#
+for (bin in 1:14) {
+  # Subset data for the current Bin#
+  subset_data <- sw[sw$`Bucket#` == bin, ]
+  
+  # Calculate the median TA for the current Bin#
+  median_TA <- median(subset_data$TA)
+  
+  # Assign the median value to the corresponding row in the final result dataframe
+  final_result.TA[final_result.TA$Bin == bin, "med.TA"] <- median_TA
+}
+
+# Print the final_result dataframe
+print(final_result.TA)
+
+##########pH
+
+# Iterate over each Bin#
+for (bin in 1:14) {
+  # Subset data for the current Bin#
+  subset_data <- sw[sw$`Bucket#` == bin, ]
+  
+  # Calculate the median TA for the current Bin#
+  median_pH <- median(subset_data$ph.spec)
+  
+  # Assign the median value to the corresponding row in the final result dataframe
+  final_result.TA[final_result.TA$Bin == bin, "med.pH"] <- median_pH
+}
+
+# Print the final_result dataframe
+print(final_result.TA)
+
+##########Temperature
+
+# Iterate over each Bin#
+for (bin in 1:14) {
+  # Subset data for the current Bin#
+  subset_data <- sw[sw$`Bucket#` == bin, ]
+  
+  # Calculate the median temperature for the current Bin#
+  median_T <- median(subset_data$T_c)
+  
+  # Assign the median value to the corresponding row in the final result dataframe
+  final_result.TA[final_result.TA$Bin == bin, "med.T"] <- median_T
+}
+
+# Print the final_result dataframe
+print(final_result.TA)
+
+##########Salinity
+
+# Iterate over each Bin#
+for (bin in 1:14) {
+  # Subset data for the current Bin#
+  subset_data <- sw[sw$`Bucket#` == bin, ]
+  
+  # Calculate the median temperature for the current Bin#
+  median_S <- median(subset_data$S)
+  
+    # Assign the median value to the corresponding row in the final result dataframe
+  final_result.TA[final_result.TA$Bin == bin, "med.S"] <- median_S
+}
+
+# Print the final_result dataframe
+print(final_result.TA)
+
+##########Omega Calcite
+
+# Iterate over each Bin#
+for (bin in 1:14) {
+  # Subset data for the current Bin#
+  subset_data <- sw[sw$`Bucket#` == bin, ]
+  
+  # Calculate the median temperature for the current Bin#
+  median_OmC <- median(subset_data$Om_c)
+  
+    # Assign the median value to the corresponding row in the final result dataframe
+  final_result.TA[final_result.TA$Bin == bin, "med.OmC"] <- median_OmC
+}
+
+# Print the final_result dataframe
+print(final_result.TA)
+
+######Merging them all together: 
+sw.med = final_result.TA 
+
+#adding a column to gro TA with the median values
+
+# Initialize empty columns for median values in the 'mass' dataframe
+mass$med.ta <- NA
+mass$med.pH <- NA
+mass$med.S <- NA
+mass$med.T <- NA
+mass$med.OmC <- NA
+
+sw.med = subset(sw.med,
+                Bin != 7 &
+                Bin != 14)
+
+# Loop through bins 1 to 14
+for (bin in 1:14) {
+  # Filter 'sw.med' for the current bin and get the median TA
+  median_ta <- sw.med[sw.med$Bin == bin, "med.TA"]
+  median_pH <- sw.med[sw.med$Bin == bin, "med.pH"]
+  median_T <- sw.med[sw.med$Bin == bin, "med.T"]
+  median_S <- sw.med[sw.med$Bin == bin, "med.S"]
+  median_OmC <- sw.med[sw.med$Bin == bin, "med.OmC"]
+  # Assign the median TA to the corresponding 'mass' rows based on Bucket#
+  mass$med.ta[mass$`Bucket#` == bin] <- median_ta
+  mass$med.pH[mass$`Bucket#` == bin] <- median_pH
+  mass$med.T[mass$`Bucket#` == bin] <- median_T
+  mass$med.S[mass$`Bucket#` == bin] <- median_S
+  mass$med.OmC[mass$`Bucket#` == bin] <- median_OmC
+}
+
+mass.full = mass #saving as a full df in case I need to reference after subsetting
 
 ```
 omitting control points from mass data; omitting CV_ID that fell off/died during trial; saved as mass and sa.proc
 ```{r}
 #omitting controls
 mass = mass[mass$med.S > 0 & mass$med.ta > 0,]
-#omitting CV ids that fell off during trial
-sa.proc = subset(sa, sa$CV_ID != 581 &
+
+sa.proc = sa[sa$dps == 0 | sa$dps == 18 | sa$dps == 36,]
+
+```
+calculating growth rate from time step to time step; new df as growth_rate from sa.proc
+```{r}
+library(dplyr)
+
+growth_rate = sa.proc %>%
+  # first sort by year
+  group_by(CV_ID) %>%
+  mutate(Diff_time = date.numb - lag(date.numb),  # Difference in time (just in case there are gaps)
+         Diff_growth = SA.mm2.RE - lag(SA.mm2.RE),
+         Net_growth.d = ((SA.mm2.RE - SA.start)/(dps)),
+         incr_growth.d = (Diff_growth/Diff_time),
+         Net_growth.w = Net_growth.d * 7,
+         incr_growth.w = (Diff_growth/Diff_time)*7,
+         Net_growth = (SA.mm2.RE - SA.start)
+         )
+
+```
+merging the growth + treatments + mass into one data frame; new df to use from here = dat
+```{r}
+full = merge(growth_rate, mass, by = "CV_ID")
+dat = subset(full, 
+             SA.start < 245 &
+             Net_growth > -5 &
+             `%oc.ic.shell` > 0 &
+               CV_ID != 526&
+               CV_ID != 536&
+               CV_ID != 538)
+dat.ids = unique(dat[dat$dps == 36,]$CV_ID)
+# Subset dat dataframe based on CV_ID being in dat.ids
+subset_dat <- dat[dat$CV_ID %in% dat.ids, ]
+
+unique(subset_dat$CV_ID)
+
+
+#full$SA.start < 250 &
+dat$TA.treat.x = as.factor(dat$TA.treat.x)
+
+write.csv(subset_dat, file = "dat.processed.csv", row.names = F) #WILL USE THIS DF FOR MODELING IN OTHER R MARKDOWN FILE
+#write.csv(subset_dat, file = "dat.processed2.csv", row.names = F) #WILL USE THIS DF FOR MODELING IN OTHER R MARKDOWN FILE
+
+```
+control
+```{r}
+
+dat = subset_dat
+
+plot(control$shell.wt ~ control$SA.mm2, pch = 19, col = as.factor(control$Plate))
+
+plot(control$shell.wt ~ control$gut.wt, pch = 19, col = as.factor(control$Plate))
+
+control$CI = control$gut.wt/control$shell.wt
+boxplot(control$CI ~ control$Plate) #CI went down in controls; potentially indicating that oysters were in a phase of producing less shell, using tissue reserves (dormancy?) and that food + our temp was not warm enough to wake them up fully.
+
+ave.pre.gut = mean(control[control$Plate == "pre",]$gut.wt)
+
+ave.post.gut = mean(control[control$Plate == "post",]$gut.wt)
+
+ave.pre.ci = mean(control[control$Plate == "pre",]$CI)
+
+ave.post.ci = mean(control[control$Plate == "post",]$CI)
+
+ave.pre.sa.mm2 = mean(control[control$Plate == "pre",]$SA.mm2)
+
+ave.post.sa.mm2 = mean(control[control$Plate == "post",]$SA.mm2)
+
+boxplot(SA.mm2 ~ sal.treat.x + TA.treat.x, dat = dat[dat$dps == 36,])
+abline(h = c(ave.pre.sa.mm2), lwd = 2, lty = 2)
+
+boxplot(CI ~ sal.treat.x + TA.treat.x, dat = dat[dat$dps == 36,], ylim = c(0.005,0.029))
+abline(h = c(ave.pre.ci), lwd = 2, lty = 2)
+
+boxplot(gut.wt ~ sal.treat.x + TA.treat.x, dat = dat[dat$dps == 36,])
+abline(h = c(ave.pre.ci), lwd = 2, lty = 2)
+
+
+```
+
+survival, tissue wt, shell growth per day
+```{r}
+
+dat$ave.tiss = NA
+dat[dat$T. == "T1",]$ave.tiss <- mort[mort$T. == "T1",]$ave.tiss
+dat[dat$T. == "T2",]$ave.tiss <- mort[mort$T. == "T2",]$ave.tiss
+dat[dat$T. == "T3",]$ave.tiss <- mort[mort$T. == "T3",]$ave.tiss
+dat[dat$T. == "t1",]$ave.tiss <- mort[mort$T. == "t1",]$ave.tiss
+dat[dat$T. == "t2",]$ave.tiss <- mort[mort$T. == "t2",]$ave.tiss
+dat[dat$T. == "t3",]$ave.tiss <- mort[mort$T. == "t3",]$ave.tiss
+
+#adding in omega column
+dat$med.omC = carb(flag = 8, var1 = dat$med.pH, var2 = dat$med.ta/10^6, T = dat$med.T, S = dat$med.S)$OmegaCalcite
+
+dat$med.omA = carb(flag = 8, var1 = dat$med.pH, var2 = dat$med.ta/10^6, T = dat$med.T, S = dat$med.S)$OmegaAragonite
+
+plot(dat$mort ~ dat$med.ta)
+plot(dat$mort ~ dat$med.S)
+plot(dat$mort ~ dat$med.omC)
+plot(dat$mort ~ dat$med.omA)
+plot(dat$med.ta ~ dat$med.omC)
+boxplot(dat$mort ~ dat$TA.treat.x + dat$sal.treat.x)
+
+#dry tissue weight at the end
+boxplot(dat$ave.tiss ~ dat$T.)
+abline(h=c(ave.post.gut, ave.post.gut))
+
+plot(gut.wt ~ med.ta, pch = 19, data = dat[dat$dps == 36,])
+plot((dat$gut.wt - ave.post.gut) ~ dat$med.ta, pch = 19)
+plot((dat$gut.wt - ave.post.gut) ~ dat$med.S, pch = 19)
+
+
+
+summary(lm((CI - ave.pre.ci) ~ factor(T.), data = dat[dat$dps == 36,]))
+#now run a post hoc to see if CI is lower? 
+lm_model =  lm((CI - ave.pre.ci) ~ factor(T.), data = dat[dat$dps == 36, ])
+# Conduct pairwise comparisons of factor levels using Tukey's method
+# Load the emmeans package
+install.packages("emmeans")
+library(emmeans)
+
+# Conduct pairwise comparisons of factor levels using Tukey's method
+posthoc <- emmeans(lm_model, ~ factor(T.), adjust = "tukey")
+
+# Summarize the comparisons
+summary(posthoc)
+plot(posthoc) #this shows that the two high S high TA treatments had CI similar to the pre Ci whereas the rest of the treatments had reduced CI relative to control.
+
+
+
+
+```
+
+
+
+EXTRA CODE BELOW 
+```{r}
+
+#sa.proc = subset(sa, sa$CV_ID != 581 &
                    sa$CV_ID != 578 & 
                    sa$CV_ID != 577 & 
                    sa$CV_ID != 571 &             
@@ -164,289 +399,6 @@ sa.proc = subset(sa, sa$CV_ID != 581 &
                    sa$CV_ID != 13 &
                    sa$CV_ID != 7 & 
                    sa$CV_ID != 6)
-```
-calculating growth rate from time step to time step; new df as growth_rate from sa.proc
-```{r}
-library(dplyr)
-sa.proc = sa.proc[sa.proc$dps == 0 | sa.proc$dps == 15 | sa.proc$dps == 36,]
-
-growth_rate = sa.proc %>%
-  # first sort by year
-  group_by(CV_ID) %>%
-  mutate(Diff_time = date.numb - lag(date.numb),  # Difference in time (just in case there are gaps)
-         Diff_growth = SA.mm2 - lag(SA.mm2), # Difference in route between years
-         Net_growth = SA.mm2 - SA.start,
-         incr_growth = (Diff_growth/Diff_time)# growth rate in percent 
-         )
-
-```
-merging the growth + treatments + mass into one data frame; new df to use from here = dat
-```{r}
-full = merge(growth_rate, mass, by = "CV_ID")
-dat = full[full$SA.start < 250 & full$Net_growth > -15 & full$`%oc.ic.shell` > 0,]
-dat$TA.treat.x = as.factor(dat$TA.treat.x)
-```
-
-what is the effect of TA on growth rate?
-```{r}
-amb.S = dat[dat$sal.treat.x == "amb",]
-
-#after 5 weeks of exposure
-end = amb.S[amb.S$dps == 36,]
-mod = aov(Net_growth ~ factor(TA.treat.x), data=end, na.action=na.omit)
-TukeyHSD(mod, factor("end$TA.treat.x"))
-plot(TukeyHSD(mod, factor("end$TA.treat.x")))
-
-boxplot(((amb.S[amb.S$dps == 36,]$Net_growth)/5) ~ amb.S[amb.S$dps == 36,]$TA.treat.x, pch = 19, ylab = NA, xlab = NA, names= NA, ylim = c(-5,15), frame.plot = F, xlim = c(0,4), axes = F)
-lines(x= c(0,4), y=c(-5,-5), lwd = 2)
-lines(x= c(0,0), y=c(-5,15), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(1,2,3), labels = c("860","1864","2837"), cex.axis = 1.15)
-axis(side = 1, line = 0.25, tick = F, at = 2, labels = "Median total alkalinity concentration (umol kg -1)", cex.axis = 1.15)
-axis(side = 1, line = 1.25, tick = F, at = c(1,2,3), labels = c("-60%","-17%","+26%"), cex.axis = 0.8)
-axis(side = 1, line = 2, tick = F, at = 2, labels = "Alkalinity change relative to ambient (2250 umol kg-1)", cex.axis = 0.8)
-axis(side = 2, line = -1.5, tick = F, at = c(-5,0,5,10,15), labels = c("-5","0","5", "10", "15"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 1.25, tick = F, at = 5, labels = 'Net surface area growth rate', cex.axis = 1.15)
-axis(side = 2, line = -0.25, tick = F, at = 5, labels = expression(paste('(mm'^2,' wk'^-1,')')), cex.axis = 1.15)
-
-text(x = 1, y = 10, label = "a", cex = 1.15)
-text(x = 2, y = 8, label = "a", cex = 1.15)
-text(x = 3, y = 13, label = "b", cex = 1.15)
-
-```
-what is the effect of TA under low S conditions?
-```{r}
-low.S = dat[dat$sal.treat.x == "low",]
-
-#after 5 weeks of exposure
-boxplot((low.S[low.S$dps == 36,]$Net_growth)/5 ~ low.S[low.S$dps == 36,]$TA.treat.x, pch = 19, ylab = NA, xlab = NA, names= NA, ylim = c(-5,15), frame.plot = F, xlim = c(0,4), axes = F)
-lines(x= c(0,4), y=c(-5,-5), lwd = 2)
-lines(x= c(0,0), y=c(-5,15), lwd = 2)
-
-axis(side = 1, line = -1, tick = F, at = c(1,2,3), labels = c("645","1414","2126"), cex.axis = 1.15)
-axis(side = 1, line = 0.25, tick = F, at = 2, labels = "Median total alkalinity concentration (umol kg -1)", cex.axis = 1.15)
-axis(side = 1, line = 1.25, tick = F, at = c(1,2,3), labels = c("'Rain'","'Low TA river'","'High TA river'"), cex.axis = 0.8)
-axis(side = 1, line = 2, tick = F, at = 2, labels = "Simulated mixing of freshwater source", cex.axis = 0.8)
-axis(side = 2, line = -1.5, tick = F, at = c(-5,0,5,10,15), labels = c("-5","0","5", "10", "15"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 1.25, tick = F, at = 5, labels = 'Net surface area growth rate', cex.axis = 1.15)
-axis(side = 2, line = -0.25, tick = F, at = 5, labels = expression(paste('(mm'^2,' wk'^-1,')')), cex.axis = 1.15)
-
-text(x = 1, y = 10, label = "a", cex = 1.15)
-text(x = 2, y = 9, label = "a", cex = 1.15)
-text(x = 3, y = 14, label = "b", cex = 1.15)
-
-
-end = low.S[low.S$dps == 36,]
-mod = aov(Net_growth ~ factor(TA.treat.x), data=end, na.action=na.omit)
-TukeyHSD(mod, factor("end$TA.treat.x"))
-plot(TukeyHSD(mod, factor("end$TA.treat.x")))
-
-```
-do the effects of TA and S appear as 'shock effects' (ie they disappear after two weeks) or do they persist? need to look at incremental growth here...
-```{r}
-dat = dat[dat$dps != 0,]
-#amb salinity
-amb.S = amb.S[amb.S$dps != 0,]
-#incremental growth rates decline in amb TA conditions, suggesting that maybe the effect of altered
-boxplot(amb.S$incr_growth ~ amb.S$dps : amb.S$TA.treat.x, pch = 19, ylab = NA, xlab = NA, col = unique(c("grey","grey40")), names= NA, ylim = c(-1.5,3.5), frame.plot = F, xlim = c(0,9), axes = F)
-text(x = 8, y = 2.8, labels = c("Exposure period"), cex = 1.25)
-legend(x=6.6,y=2.8,fill = c("grey","grey40"),legend = c("days 0-15","days 15-36"),bty = "n", cex = 1.2, x.intersp=0.4)
-lines(x= c(0,7), y=c(-1.5,-1.5), lwd = 2)
-lines(x= c(0,0), y=c(-1.5,3.5), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(1.5,3.5,5.5), labels = c("Reduction","Control","Increase"), cex.axis = 1.25)
-axis(side = 1, line = .25, tick = F, at = 3.5, labels = "Alkalinity Level", cex.axis = 1.25)
-axis(side = 2, line = -1.5, tick = F, at = c(-1,0,1,2,3), labels = c("-1.0","0.0","1.0","2.0","3.0"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 1.75, tick = F, at = 1, labels = "Surface area growth rate", cex.axis = 1.25)
-axis(side = 2, line = .25, tick = F, at = 1, labels = expression(paste('(mm'^2,' day'^-1,')')), cex.axis = 1.25)
-
-
-low.S = low.S[low.S$dps != 0,]
-boxplot(low.S$incr_growth ~ low.S$dps : low.S$TA.treat.x, pch = 19, ylab = NA, xlab = NA, col = unique(c("grey","grey40")), names= NA, ylim = c(-1.5,4.5), frame.plot = F, xlim = c(0,9), axes = F)
-text(x = 8, y = 2.8, labels = c("Exposure period"), cex = 1.25)
-legend(x=6.6,y=2.8,fill = c("grey","grey40"),legend = c("days 0-15","days 15-36"),bty = "n", cex = 1.2, x.intersp=0.4)
-lines(x= c(0,7), y=c(-1.5,-1.5), lwd = 2)
-lines(x= c(0,0), y=c(-1.5,4.5), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(1.5,3.5,5.5), labels = c("Rain","Low TA","High TA"), cex.axis = 1.25)
-axis(side = 1, line = .25, tick = F, at = 3.5, labels = "Simulated FW source", cex.axis = 1.25)
-axis(side = 2, line = -1.5, tick = F, at = c(-1,0,1,2,3,4), labels = c("-1.0","0.0","1.0","2.0","3.0","4.0"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 1.75, tick = F, at = 1.5, labels = "Surface area growth rate", cex.axis = 1.25)
-axis(side = 2, line = .25, tick = F, at = 1.5, labels = expression(paste('(mm'^2,' day'^-1,')')), cex.axis = 1.25)
-mod = aov(incr_growth ~ factor(TA.treat.x) : factor(dps), data=low.S, na.action=na.omit)
-TukeyHSD(mod, factor("TA.treat.x:dps"))
-plot(TukeyHSD(mod, factor("TA.treat.x:dps")))
-```
-
-NO EFFECT OF TA OR S (LINEAR) ON CI; see linear model tries for model output.
-
-shell properties + CI
-```{r}
-plot(amb[amb$dps == 36,]$SA.mm2 ~ amb[amb$dps == 36,]$gut.wt, pch = 19, col = as.factor(amb[amb$dps == 36,]$sal.treat.x), ylab = "Surface area of shell (mm2)", xlab = "Dry tissue mass (mg)")
-summary(lm(amb[amb$dps == 36,]$SA.mm2 ~ amb[amb$dps == 36,]$gut.wt + factor(amb[amb$dps == 36,]$sal.treat.x)))
-abline(52.8442, 13.2406, col = "black", lwd = 3)
-abline(52.5430+24.0465, 13.2406, col = "red", lwd = 3)
-legend(x = 13, y = 125, legend = c("low", "ambient"), fill = c("red","black"), bty = "n")
-text(x = 14.5, y = 125, labels = "Salinity")
-
-#effect of S
-        #on condition index
-boxplot(amb[amb$dps == 36,]$CI ~ amb[amb$dps == 36,]$sal.treat.x, pch = 19, col = "grey40", ylab = NA, xlab = NA, names= NA, ylim = c(0,0.03), frame.plot = F, xlim = c(0,3), axes = F)
-lines(x= c(0,4), y=c(0,0), lwd = 2)
-lines(x= c(0,0), y=c(0,0.03), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(1,2), labels = c("Ambient","Reduced"), cex.axis = 1.25)
-axis(side = 1, line = .5, tick = F, at = 1.5, labels = "Salinity Level", cex.axis = 1.25)
-axis(side = 2, line = -1.75, tick = F, at = c(0,0.0050,0.01,0.015,0.02,0.025,0.03), labels = c("0","0.005","0.01","0.015","0.02","0.025","0.03"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 1.25, tick = F, at = 0.015, labels = 'Condition index (tissue/shell mass)', cex.axis = 1.25)
-        #on organics in shell
-boxplot(amb[amb$dps == 36,]$`%oc.ic.shell` ~ amb[amb$dps == 36,]$sal.treat.x, pch = 19, col = "grey40", ylab = NA, xlab = NA, names= NA, ylim = c(0.5,2), frame.plot = F, xlim = c(0,3), axes = F)
-lines(x= c(0.25,3), y=c(0.5,0.5), lwd = 2)
-lines(x= c(0.25,0.25), y=c(0.5,2), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(1,2), labels = c("Ambient","Reduced"), cex.axis = 1.25)
-axis(side = 1, line = .5, tick = F, at = 1.5, labels = "Salinity Level", cex.axis = 1.25)
-axis(side = 2, line = -3.5, tick = F, at = c(0.5,1,1.5,2), labels = c("0.5","1.0","1.5","2.0"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 0, tick = F, at = 1.25, labels = 'Organic C in shell', cex.axis = 1.25)
-axis(side = 2, line = -1.25, tick = F, at = 1.25, labels = '(% of total shell mass)', cex.axis = 1.25)
-
-#effect of TA
-        #on condition index
-boxplot(amb.S[amb.S$dps == 36,]$CI ~ amb.S[amb.S$dps == 36,]$TA.treat.x, pch = 19, col = "grey40", ylab = NA, xlab = NA, names= NA, ylim = c(0,0.03), frame.plot = F, xlim = c(0,4), axes = F)
-summary(aov(amb.S[amb.S$dps == 36,]$CI ~ amb.S[amb.S$dps == 36,]$TA.treat.x))
-TukeyHSD(aov(amb.S$CI ~ amb.S$TA.treat.x),"amb.S$TA.treat.x")
-lines(x= c(0,4), y=c(0,0), lwd = 2)
-lines(x= c(0,0), y=c(0,0.03), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(1,2,3), labels = c("reduced","ambient","elevated"), cex.axis = 1.25)
-axis(side = 1, line = .5, tick = F, at = 2, labels = "Alkalinity Level", cex.axis = 1.25)
-axis(side = 2, line = -1.75, tick = F, at = c(0,0.0050,0.01,0.015,0.02,0.025,0.03), labels = c("0","0.005","0.01","0.015","0.02","0.025","0.03"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 1.25, tick = F, at = 0.015, labels = 'Condition index (tissue/shell mass)', cex.axis = 1.25)
-        #on organics in shell
-boxplot(amb.S[amb.S$dps == 36,]$`%oc.ic.shell` ~ amb.S[amb.S$dps == 36,]$TA.treat.x, pch = 19, col = "grey40", ylab = NA, xlab = NA, names= NA, ylim = c(0.5,2), frame.plot = F, xlim = c(0,4), axes = F)
-lines(x= c(0.25,4), y=c(0.5,0.5), lwd = 2)
-lines(x= c(0.25,0.25), y=c(0.5,2), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(1,2,3), labels = c("reduced","ambient","elevated"), cex.axis = 1.25)
-axis(side = 1, line = .5, tick = F, at = 2, labels = "Alkalinity Level", cex.axis = 1.25)
-axis(side = 2, line = -3, tick = F, at = c(0.5,1,1.5,2), labels = c("0.5","1.0","1.5","2.0"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 0, tick = F, at = 1.25, labels = 'Organic C in shell', cex.axis = 1.25)
-axis(side = 2, line = -1.25, tick = F, at = 1.25, labels = '(% of total shell mass)', cex.axis = 1.25)
-
-#effect of TA in simulated freshwater events
-        #on condition index
-boxplot(low.S[low.S$dps == 36,]$CI ~ low.S[low.S$dps == 36,]$TA.treat.x, pch = 19, col = "grey40", ylab = NA, xlab = NA, names= NA, ylim = c(0,0.03), frame.plot = F, xlim = c(0,4), axes = F)
-summary(aov(low.S[low.S$dps == 36,]$CI ~ factor(low.S[low.S$dps == 36,]$TA.treat.x)))
-TukeyHSD(aov(low.S$CI ~ low.S$TA.treat.x),"low.S$TA.treat.x")
-lines(x= c(0,4), y=c(0,0), lwd = 2)
-lines(x= c(0,0), y=c(0,0.03), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(1,2,3), labels = c("rain","low TA","high TA"), cex.axis = 1.25)
-axis(side = 1, line = .5, tick = F, at = 2, labels = "Alkalinity Level", cex.axis = 1.25)
-axis(side = 2, line = -1.75, tick = F, at = c(0,0.0050,0.01,0.015,0.02,0.025,0.03), labels = c("0","0.005","0.01","0.015","0.02","0.025","0.03"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 1.25, tick = F, at = 0.015, labels = 'Condition index (tissue/shell mass)', cex.axis = 1.25)
-            #on organics in shell
-boxplot(low.S[low.S$dps == 36,]$`%oc.ic.shell` ~ low.S[low.S$dps == 36,]$TA.treat.x, pch = 19, col = "grey40", ylab = NA, xlab = NA, names= NA, ylim = c(0.5,2), frame.plot = F, xlim = c(0,4), axes = F)
-lines(x= c(0.25,4), y=c(0.5,0.5), lwd = 2)
-lines(x= c(0.25,0.25), y=c(0.5,2), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(1,2,3), labels = c("rain","low TA","high TA"), cex.axis = 1.25)
-axis(side = 1, line = .5, tick = F, at = 2, labels = "Simulated FW exposure", cex.axis = 1.25)
-axis(side = 2, line = -3, tick = F, at = c(0.5,1,1.5,2), labels = c("0.5","1.0","1.5","2.0"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 0, tick = F, at = 1.25, labels = 'Organic C in shell', cex.axis = 1.25)
-axis(side = 2, line = -1.25, tick = F, at = 1.25, labels = '(% of total shell mass)', cex.axis = 1.25)
-```
-looking into what drives the variability?
-```{r}
-plot(amb.S$med.ta ~ amb.S$med.pH)
-
-```
-
-linear model tries
-```{r}
-
-library(nlme)
-library(lme4)
-library(emmeans)
-
-#transforming the data by making all values positive (adding 27 to the y)
-dat$Net_growth.trans = dat$Net_growth/5 + 20
-dat.36 = as.data.frame(dat[dat$dps == 36,])
-
-mod.full = lme((CI) ~ med.ta + med.S , random = ~1|bucket, data = dat.36, na.action = na.exclude)
-summary(mod.full)
-
-mod.full = lme((Net_growth/5) ~ med.ta + med.S , random = ~1|bucket, data = dat.36, na.action = na.exclude)
-summary(mod.full) #effect of TA only on net growth rate; did not change in lower salinity.
-
-plot(dat.36$Net_growth/5 ~ dat.36$med.ta, col = as.factor(dat.36$sal.treat.x), pch = 19, xlab = NA, ylab = NA, bty = "n", frame.plot = F, axes = F, ylim = c(-5,12), xlim = c(400,3000))
-lines(x= c(400,3500), y=c(-5,-5), lwd = 2)
-lines(x= c(400,400), y=c(-5,15), lwd = 2)
-lines(x= c(2250,2250), y= c(-4.8,15), lwd = 2, lty = 2, col = "grey72")
-axis(side = 1, line = -1, tick = F, at = c(500,1000,1500,2000,2500,3000), labels = c("500","1000","1500","2000","2500","3000"), cex.axis = 1.15)
-axis(side = 1, line = 0.5, tick = F, at = 1750, labels = "Median total alkalinity concentration (umol kg -1)", cex.axis = 1.15)
-points(dat.36[dat.36$sal.treat.x == "amb",]$Net_growth/5 ~ jitter(dat.36[dat.36$sal.treat.x == "amb",]$med.ta,10), col = "black", pch = 19, cex = 1.2)
-points(dat.36[dat.36$sal.treat.x == "low",]$Net_growth/5 ~ jitter(dat.36[dat.36$sal.treat.x == "low",]$med.ta,10), col = "black", pch = 17, cex = 1.2)
-
-axis(side = 2, line = -1.5, tick = F, at = c(-4.2,0.5,5,10,15), labels = c("-5","0","5", "10", "15"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 1.25, tick = F, at = 2.5, labels = 'Net surface area growth rate', cex.axis = 1.15)
-axis(side = 2, line = -0.25, tick = F, at = 2.5, labels = expression(paste('(mm'^2,' wk'^-1,')')), cex.axis = 1.15)
-
-
-
-#summary(lm((Net_growth/5) ~ med.ta + med.S, data = dat.36))
-
-#abline(0,0.0009965, lwd = 2, col = "black")
-
-
-
-
-
-# histograms of response variable(s); look for gaussian distribution
-
-hist(sqrt(dat.36$Net_growth.trans))
-
-#plot response variable by each of the predictors; look at spread of data
-plot(sqrt(dat.36$Net_growth.trans) ~ (dat.36$med.S), pch = 19)
-plot(sqrt(dat.36$Net_growth.trans) ~ (dat.36$med.ta), pch = 19)
-
-#was pH important to consider? 
-plot(dat.36$med.pH ~ dat.36$med.ta,col = as.factor(dat.36$sal.treat.x), pch = 19, cex = 1.5)
-
-library(seacarb)
-dat.36$om_cal = carb(flag = 8, var1 = dat.36$med.pH, var2 = dat.36$med.ta/(10^6), S = dat.36$med.S, T = 14)$OmegaCalcite
-plot(dat.36$om_cal ~ dat.36$med.ta,col = as.factor(dat.36$sal.treat.x), pch = 19, cex = 1.5)
-
-
-mod.full = lme(log(Net_growth.trans) ~ med.ta + med.S, random = ~1|bucket, data = dat.36, na.action = na.exclude)
-summary(mod.full)
-```
-
-what is the effect of S on growth?
-```{r}
-#creating a df with just amb TA and just low TA
-amb = dat[dat$med.ta>1800 & dat$med.ta<2300,]
-low = dat[dat$med.ta < 1000,]
-
-#at ambient TA, low S individuals had higher overall growth
-end = amb[amb$dps == 36,]
-mod = aov(Net_growth ~ factor(med.S), data=end, na.action=na.omit)#using med.S so that I can not have bucket at a grouping variable?
-summary(mod)
-
-
-boxplot(amb[amb$dps == 36,]$Net_growth ~ amb[amb$dps == 36,]$TA.treat.x, pch = 19, ylab = NA, xlab = NA, names= NA, ylim = c(-20,60), frame.plot = F, xlim = c(0,4), axes = F, col = "grey40")
-lines(x= c(1,4), y=c(-20,-20), lwd = 2)
-lines(x= c(1,1), y=c(-20,60), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(2,3), labels = c("Ambient","Reduced"), cex.axis = 1.25)
-axis(side = 1, line = .5, tick = F, at = 2.5, labels = "Salinity Level", cex.axis = 1.25)
-axis(side = 2, line = -7.5, tick = F, at = c(-20,-10,0,10,20,30,40,50,60), labels = c("-20","-10","0","10","20","30","40","50","60"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = -5.75, tick = F, at = 20, labels = expression(paste('Net surface area growth (mm'^2,')')), cex.axis = 1.25)
-
-boxplot(amb[amb$dps == 15,]$Net_growth ~ amb[amb$dps == 15,]$TA.treat.x, pch = 19, ylab = NA, xlab = NA, names= NA, ylim = c(-20,70), frame.plot = F, xlim = c(0,4), axes = F, col = "grey")
-lines(x= c(1,4), y=c(-20,-20), lwd = 2)
-lines(x= c(1,1), y=c(-20,60), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(2,3), labels = c("Ambient","Reduced"), cex.axis = 1.25)
-axis(side = 1, line = .5, tick = F, at = 2.5, labels = "Salinity Level", cex.axis = 1.25)
-axis(side = 2, line = -7.5, tick = F, at = c(-20,-10,0,10,20,30,40,50,60), labels = c("-20","-10","0","10","20","30","40","50","60"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = -5.75, tick = F, at = 20, labels = expression(paste('Net surface area growth (mm'^2,')')), cex.axis = 1.25)
-
-```
-
-
-
-EXTRA CODE BELOW 
-```{r}
 
 #omitting CV ids that DIED off during trial
 sa.proc = subset(sa,sa$CV_ID != 577 & 
@@ -490,7 +442,11 @@ sa.proc = subset(sa,sa$CV_ID != 577 &
 
 ```
 ################################################
+looking into what drives the variability?
+```{r}
+plot(amb.S$med.ta ~ amb.S$med.pH)
 
+```
 look at the dat data and correcting for outliers? 
 ```{r}
 plot(dat$Net_growth ~ dat$SA.start, pch = 19, col = as.factor(dat$TA.treat.x))
@@ -504,7 +460,35 @@ plot(dat$Net_growth, pch = 19)
 abline(h=c(min,max))
 
 ```
+what is the effect of S on growth?
+```{r}
+#creating a df with just amb TA and just low TA
+amb = dat[dat$med.ta>1800 & dat$med.ta<2300,]
+low = dat[dat$med.ta < 1000,]
 
+#at ambient TA, low S individuals had higher overall growth
+end = amb[amb$dps == 36,]
+mod = aov(Net_growth ~ factor(med.S), data=end, na.action=na.omit)#using med.S so that I can not have bucket at a grouping variable?
+summary(mod)
+
+
+boxplot(amb[amb$dps == 36,]$Net_growth ~ amb[amb$dps == 36,]$TA.treat.x, pch = 19, ylab = NA, xlab = NA, names= NA, ylim = c(-20,60), frame.plot = F, xlim = c(0,4), axes = F, col = "grey40")
+lines(x= c(1,4), y=c(-20,-20), lwd = 2)
+lines(x= c(1,1), y=c(-20,60), lwd = 2)
+axis(side = 1, line = -1, tick = F, at = c(2,3), labels = c("Ambient","Reduced"), cex.axis = 1.25)
+axis(side = 1, line = .5, tick = F, at = 2.5, labels = "Salinity Level", cex.axis = 1.25)
+axis(side = 2, line = -7.5, tick = F, at = c(-20,-10,0,10,20,30,40,50,60), labels = c("-20","-10","0","10","20","30","40","50","60"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = -5.75, tick = F, at = 20, labels = expression(paste('Net surface area growth (mm'^2,')')), cex.axis = 1.25)
+
+boxplot(amb[amb$dps == 15,]$Net_growth ~ amb[amb$dps == 15,]$TA.treat.x, pch = 19, ylab = NA, xlab = NA, names= NA, ylim = c(-20,70), frame.plot = F, xlim = c(0,4), axes = F, col = "grey")
+lines(x= c(1,4), y=c(-20,-20), lwd = 2)
+lines(x= c(1,1), y=c(-20,60), lwd = 2)
+axis(side = 1, line = -1, tick = F, at = c(2,3), labels = c("Ambient","Reduced"), cex.axis = 1.25)
+axis(side = 1, line = .5, tick = F, at = 2.5, labels = "Salinity Level", cex.axis = 1.25)
+axis(side = 2, line = -7.5, tick = F, at = c(-20,-10,0,10,20,30,40,50,60), labels = c("-20","-10","0","10","20","30","40","50","60"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = -5.75, tick = F, at = 20, labels = expression(paste('Net surface area growth (mm'^2,')')), cex.axis = 1.25)
+
+```
 
 looking at growth ratios across time periods
 ```{r}
