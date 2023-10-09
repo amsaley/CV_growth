@@ -13,6 +13,7 @@ library(readxl)
 library(lme4)
 library(lmerTest)
 dat = read.csv("C:/Users/alish/OneDrive/Documents/GitHub/CV_growth/data files/dat.processed.csv")
+dat = dat[dat$CI > 0.005,]
 control = read_xlsx("control cv.xlsx")
 ```
 grouping treatments by treatments; creating end and inc
@@ -41,406 +42,837 @@ dat[dat$T. == "t1",]$nrow <- nt1
 dat[dat$T. == "t2",]$nrow <- nt2
 dat[dat$T. == "t3",]$nrow <- nt3
 
+#Removing outlier points from the data set
+plot(dat$Net_growth.d)
+summary(dat$Net_growth.d)
+q1 = 0.1903
+q3 = 0.8038
+iqr = q3-q1
+max = q3+(1.5*iqr)
+  min = q1-(1.5*iqr)
+plot(dat$Net_growth.d)
+abline(h=c(min,max))
+
+
 #after 5 weeks of exposure
-end = dat[dat$dps == 36,]
+end = subset(dat,
+             dps == 36 &
+             Net_growth.d < max)
 end$Net_growth.w.trans = log(end$Net_growth.w + 10)
 
 plot((Net_growth.w.trans) ~ med.ta, pch = 19, col = as.factor(sal.treat.x), data = end)
 
 #for incremental growth we need to delete the first time step
 inc = subset(dat,
-             dps >1)
+             dps >1&
+             Net_growth.d < max)
+
+#adding in a column for thickness of shell
+end$thick.mgmm2 = end$shell.wt/end$SA.mm2.RE
 
 ```
 
-MODELING ------------------------
+MODELS ------------------------
 
-         MODEL 1: What is the effect of [TA] on growth (amb S)?
+summary stats for different treatments
 ```{r}
 #ambient salinity
 amb.S = as.data.frame(end[end$sal.treat.x == "amb",])
+#low salinity
+low.S = as.data.frame(end[end$sal.treat.x == "low",])
 ```
-on shell growth; NO DIFFERENCE
-```{r}
-#looking at the effect of TA (vs omega?)
-boxplot(amb.S$Net_growth.d ~ as.factor(round(amb.S$med.ta,-3)))
+Checking assumptions of ANOVA model:
+1. Normality – Each sample was drawn from a normally distributed population, ie The errors or residuals are normally distributed. This can be checked by using a normality test or a QQ-plot.
 
+2. Equal Variances – The variances of the populations that the samples come from are equal. The errors or residuals have constant variance, mean zero, and are independent. This can be checked by plotting the residuals against the predictors and looking for any patterns or outliers.
+
+3. Independence – The observations in each group are independent of each other and the observations within groups were obtained by a random sample. This can be resolved with random effects.
+
+Checking the assumptions of an LME
+The model you've specified using lme in R is a linear mixed-effects model. There are several assumptions associated with this type of model that you should verify to ensure the validity of your results and conclusions. Let's discuss the key assumptions and how you can check them in R:
+
+Linearity:
+Assumption: The relationship between the predictor variables (SA.start and TA.treat.x) and the response variable (Net_growth.d.TRANS) is linear.
+Verification: Plot residuals against the fitted values and predictor variables to check for linearity.
+
+Normality of Residuals:
+Assumption: The residuals are normally distributed.
+Verification: Plot a histogram or a Q-Q plot of the residuals to assess their normality.
+
+Homoscedasticity of Residuals:
+Assumption: The residuals have constant variance (homoscedasticity).
+Verification: Plot residuals against the fitted values or predictor variables to check for patterns or changes in variance.
+
+Independence of Residuals:
+Assumption: The residuals are independent of each other.
+Verification: Plot residuals against time or any other relevant variable to check for autocorrelation or patterns.
+
+Random Effects Assumption:
+Assumption: The random effects (random intercepts for the 'bucket' variable) are normally distributed and independent of other variables.
+Verification: Check the distribution of the random effects using summary statistics or plots.
+
+Model Fit:
+Assumption: The model fits the data well.
+Verification: Examine model fit statistics such as AIC (Akaike Information Criterion) or BIC (Bayesian Information Criterion) to evaluate the model's fit.
+         MODEL 1: What is the effect of [TA] on shell growth (thickness and surface area) at ambient and lower salinity?
+         
+###ambient salinity
+
+on shell area growth; NO DIFFERENCE by TA, difference based on starting area size
+```{r}
+#quick look at the effect of TA (vs omega?)
+boxplot(amb.S$Net_growth.d ~ as.factor(round(amb.S$med.ta,-3)))
 boxplot(amb.S$Net_growth.d ~ as.factor(round(amb.S$med.OmC,0)))
 
-```
-incremental split on shell growth? growth declined in latter half of experiment overall. in the latter half of the experiment the high TA treatment had higher incremental growth than the two low TA treatments
-```{r}
-boxplot(incr_growth.d ~ dps + round(med.ta,-3), data = inc[inc$med.S > 31,], outline = F)
+#MEETING ASSUMPTIONS:
 
-inc$dps.F = as.factor(inc$dps)
+#To test for variance homogeneity among treatment groups in a mixed-effects model, you can use Levene's test or Bartlett's test. These tests compare the variances of the dependent variable (Net_growth.d) across different levels of the factor variable (TA.treat.x) to determine if the variances are approximately equal.
+# Load the necessary packages
+#testing variance heterskedasticity was done using a Bruesch-Pagan test https://www.statology.org/breusch-pagan-test-r/
 library(nlme)
-# Fit the mixed-effects model with two treatment factors
-mixed_model <- lme(incr_growth.d ~ TA.treat.x * dps.F, random = ~1|bucket, data = inc[inc$med.S > 31,])
 
-# Summary of the mixed-effects model
-summary(mixed_model)
-library(multcomp)
-# Perform the post hoc analysis (Tukey's HSD)
-posthoc_results <- glht(mixed_model, linfct = mcp(TA.treat.x = "Tukey", dps.F = "Tukey"))
-
-# Summary of post hoc analysis
-summary(posthoc_results)
-
-# Summary of ANOVA
-anova_model = aov(incr_growth.d ~ TA.treat.x * dps.F, data = inc[inc$med.S > 31,])
-summary(anova_model)
-library(agricolae)
-# Perform Tukey's HSD test for the interaction
-tukey_interaction <- HSD.test(anova_model, trt = c("TA.treat.x", "dps"), console = TRUE)
-# Print the results of the Tukey's HSD test for the interaction
-print(tukey_interaction)
-
-# FIGURE
-
-#incremental growth rates decline in amb TA conditions, suggesting that maybe the effect of altered
-boxplot(incr_growth.d ~ dps : TA.treat.x, pch = 19, ylab = NA, xlab = NA, col = unique(c("grey","grey40")), names= NA, ylim = c(-1,3.6), frame.plot = F, xlim = c(0.5,9), axes = F, data = dat[dat$sal.treat.x == "amb",], outline = F)
-text(x = 7.5, y = 2.9, labels = c("Time increment"), cex = 1.25)
-legend(x=6,y=2.85,fill = c("grey","grey40"),legend = c("0 - 18 dps","18 - 36 dps"),bty = "n", cex = 1.2, x.intersp=0.4)
-lines(x= c(0.25,7), y=c(-1,-1), lwd = 2)
-lines(x= c(0.25,0.25), y=c(-1,3.5), lwd = 2)
-axis(side = 1, line = -0.9, tick = F, at = c(1.5,3.5,5.5), labels = c("X","X","X"), cex.axis = 1.1)
-axis(side = 1, line = 0.25, tick = F, at = 3.5, labels = "Median alkalinity concentration (umol kg -1)", cex.axis = 1.1)
-axis(side = 1, line = 1.25, tick = F, at = c(1.5,3.5,5.5), labels = c("-X%","-X%","+X%"), cex.axis = 0.8)
-axis(side = 1, line = 2, tick = F, at = 3.5, labels = "Alkalinity relative to ambient (2250 umol kg-1)", cex.axis = 0.8)
-axis(side = 2, line = -0.75, tick = F, at = c(-.5,.5,1.5,2.5,3.5), labels = c("-0.5","0.5","1.5","2.5", "3.5"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 2.1, tick = F, at = 1.25, labels = 'Incremental growth rate', cex.axis = 1.1)
-axis(side = 2, line = 0.75, tick = F, at = 1.25, labels = expression(paste(' (mm'^2,' d'^-1,')')), cex.axis = 1.1)
-
-text(x = c(1,3,5), y = c(3.5,2.75,2.5), label = "a", cex = 1.15)
-text(x = 6, y = 1.75, label = "b", cex = 1.15)
-text(x = c(2,4), y = c(1,1.5), label = "c", cex = 1.15)
+#transforming the data did not work and so instead I opted to apply weighted variance within the model that is equal to the inverse of the variance in each group (smaller variance gives larger weight within the SEs of the model )
+#amb.S$Net_growth.d.TRANS = as.numeric(sqrt(amb.S$Net_growth.d+1))
 
 
-
-```
-Explore the data + check assumptions:
-Checking assumptions of ANOVA model:
-1. Normality – Each sample was drawn from a normally distributed population.
-2. Equal Variances – The variances of the populations that the samples come from are equal.
-3. Independence – The observations in each group are independent of each other and the observations within groups were obtained by a random sample.
-```{r}
-
-
-#look at the SPREAD in the relationships between the predictors and response
-plot(Net_growth.d ~ med.ta + med.S, data = end, pch = 19, ylim = c(-0.5,2), col = as.factor(sal.treat.x))
-
-#need to log it but have to transform it first amb.S$Net_growth.w.trans to use now
-
-#replot to see how it looks:
-plot(Net_growth.d ~ med.ta, data = amb.S, pch = 19) #much better; will use this response for adhering to linearity and additivity.
-boxplot(Net_growth.d ~ TA.treat.x, data = amb.S, pch = 19, outline = F) #looks good; spread of any box is no more than 2X greater than another
-
-#look at the distributions of the response variables
-hist((end$Net_growth.w.trans)) #looking for Gaussian distribution
-#looks okay!
-```
-
-```{r}
-library(nlme)
 #model with all predictors. 
-mod.full <- lme((Net_growth.w) ~ SA.start +
-                  (med.ta) + med.S, random  = ~1 | bucket, data= (end), na.action=na.omit)
+mod.full <- lme((Net_growth.d) ~ SA.start +
+                factor(TA.treat.x),
+                random  = ~1 | bucket,
+                data= (amb.S),
+                na.action=na.omit)
+
+# Calculate weights based on squared residuals (variance of the error terms)
+mod.full.w <- lme((Net_growth.d) ~ SA.start + 
+                factor(TA.treat.x),
+                random = ~1 | bucket,
+                data = (amb.S),
+                weights = varIdent(form = ~ 1 | TA.treat.x),  # Use the inverse of squared residuals as weights
+                na.action = na.omit)
+anova(mod.full, mod.full.w)
+
+#it is an improved fit! Good to go.
+
+# Residuals vs. Fitted Values
+plot(mod.full.w)
+
+# Normality of Residuals
+qqnorm(resid(mod.full.w))
+qqline(resid(mod.full.w))
+
+# Homoscedasticity of Residuals
+plot(resid(mod.full.w) ~ fitted(mod.full.w))
+
+
+#Independence: added in bucket as a random intercept
+
+#model with all predictors. 
+mod.full <- lme((Net_growth.d) ~ SA.start + 
+                factor(TA.treat.x),
+                random = ~1 | bucket,
+                data = (amb.S),
+                weights = varIdent(form = ~ 1 | TA.treat.x),  # Use the inverse of squared residuals as weights
+                na.action = na.omit)
+
+
 summary(mod.full)
 
-#there is NO effect of S but a small effect of TA on oyster growth
-# was it big enough to be captured amongst our groups? 
+#Normality: looking for Gaussian distribution
+hist(resid(mod.full)) #looks okay!
+plot(resid(mod.full) ~ amb.S$Net_growth.d)
+plot(mod.full) #std resid vs fitted values looks okay!
 
-#ambient S: net growth did NOT differ among the three TA treatments 
-mod.hiS <- lme((Net_growth.w/SA.start) ~ 
-                  factor(TA.treat.x), random  = ~1 | bucket, data= (dat[dat$dps == 36 & dat$sal.treat.x == "amb",]), na.action=na.omit)
-anova(mod.hiS)
+#KEEP THE RANDOM EFFECT. 
 
-#low S: net growth DID differ among the three TA treatments
-mod.lowS <- lme((Net_growth.w/SA.start) ~ 
-                  factor(TA.treat.x), random  = ~1 | bucket, data= (dat[dat$dps == 36& dat$sal.treat.x == "low",]), na.action=na.omit)
-anova(mod.lowS) #difference in the average growth
+library(lme4)
+# Fit the full model with the random effect
+mod.full <- lme(Net_growth.d ~ SA.start + factor(TA.treat.x), random = ~1|bucket,
+                 data = amb.S,
+                 na.action = na.omit)
 
-#which ones? highest treatment was different than both lower, but no difference between lower
-library(emmeans)
-emmeans(mod.lowS, list (pairwise ~ TA.treat.x), adjust = "tukey")
+# Fit the null model without the random effect
+mod.null <- gls(Net_growth.d ~ SA.start + factor(TA.treat.x),
+                 data = amb.S,
+                 na.action = na.omit)
 
+# Perform the likelihood ratio test
 
+#for table: 
+anova(mod.full, mod.null)    #effect of RE
 
+#effect of continuous predictors
 
+mod.full <- lmer(Net_growth.d ~ SA.start + factor(TA.treat.x) + (1 | bucket), data = amb.S, na.action = na.omit)
 
+  mod.sa = lmer(Net_growth.d ~ factor(TA.treat.x) + (1 | bucket), data = amb.S, na.action = na.omit)
 
+#compare the models
+anova(mod.full, mod.sa) #LLR/Chi sq value = 25.82, p = 3.749e-07
 
+#FINAL MODEL
+mod.final = lme((Net_growth.d) ~ SA.start + 
+                factor(TA.treat.x),
+                random = ~1 | bucket,
+                data = (amb.S),
+                weights = varIdent(form = ~ 1 | TA.treat.x),  # Use the inverse of squared residuals as weights
+                na.action = na.omit)
+summary(mod.final)
 
-
-
-
-mod.full = aov( ~ factor(TA.treat.x) + Error, data=end, na.action=na.omit)
-summary(mod.full) #Bucket is our random effect because we want to make sure that individuals grown in the same bucket are accounted for
-
-mod.RE = aov(Net_growth.w.MODEL ~ factor(), data=end, na.action=na.omit)
-
-anova(mod.full,mod.RE)
-
-
-# QQ Plot: look for datapoints falling along QQ line
-    #potential assumptions violated: Normality (if data fall heavily off of QQ line)
-    #can also use hist(resid(model)) to check for even distribution
-qqnorm(resid(mod.full)) #checks normality of the residuals
-qqline(resid(mod.full)) #adds line
-hist(resid(mod.full)) #pretty normal normal distribution of residuals
-
-
-TukeyHSD(mod.full, factor("end$TA.treat.x"))
-plot(TukeyHSD(mod, factor("end$TA.treat.x")))
-
-```
-Fixed effects:
-```{r}
-
+r.squaredGLMM(object = mod.final, null = mod.RE)
+  #r2m WHAT WE ARE INTERESTED IN?
+ #r2c
 
 ```
-Random effects:
+
+on shell mass per area; NO DIFFERENCE
 ```{r}
+#quick look at the effect of TA
+boxplot(amb.S$thick.mgmm2 ~ as.factor(round(amb.S$med.ta,-3)), outline = T)
+
+#MEETING ASSUMPTIONS:
+
+#To test for variance homogeneity among treatment groups in a mixed-effects model, you can use Levene's test or Bartlett's test. These tests compare the variances of the dependent variable (Net_growth.d) across different levels of the factor variable (TA.treat.x) to determine if the variances are approximately equal.
+# Load the necessary packages
+
+# Perform Levene's test for variance homogeneity
+levene_test_result <- leveneTest(thick.mgmm2 ~ factor(TA.treat.x), data = amb.S)
+# Summarize the Levene's test result
+print(levene_test_result)
+
+#does NOT pass test; TRIED TRANSFORMATION SQRT OR LOG RESPONSE. NEITHER FIXED ISSUE AND SO i will used weighted variance term in the model to account for heteroscedasticity
+#levene_test_result <- leveneTest(thick.mgmm2.TRANS ~ factor(TA.treat.x), data = amb.S)
+#levene_test_result #still DOES NOT PASS; need a fix
+
+#Normality: looking for Gaussian distribution
+hist(log(amb.S$thick.mgmm2)) #looks okay!
+
+#Independence: added in bucket as a random intercept
+
+#model with all predictors. NO DIFFERENCE
+mod.full <- lme((thick.mgmm2) ~ factor(TA.treat.x),
+                random  = ~1 | bucket,
+                data= (amb.S),
+                na.action=na.omit)
+#model with all predictors w weights
+mod.wt <- lme((thick.mgmm2) ~ factor(TA.treat.x),
+                random  = ~1 | bucket,
+                data= (amb.S),
+                na.action=na.omit,
+                weights = varIdent(form = ~ 1 | TA.treat.x))
+
+anova(mod.full, mod.wt) #significant p-value; we can keep the weighting as it significantly improves the model fit?
+
+#for table: 
+mod.final <- lme((thick.mgmm2) ~ factor(TA.treat.x),
+                random  = ~1 | bucket,
+                data= (amb.S),
+                na.action=na.omit,
+                weights = varIdent(form = ~ 1 | TA.treat.x))
+
+r.squaredGLMM(object = mod.final, null = mod.RE)
+     #r2m WHAT WE ARE INTERESTED IN?
+  #r2c
+
+library(lme4)
+# Fit the full model with the random effect
+mod.full <- lme(thick.mgmm2 ~ SA.start + factor(TA.treat.x), random = ~1|bucket,
+                 data = amb.S,
+                 na.action = na.omit)
+
+# Fit the null model without the random effect
+mod.null <- gls(thick.mgmm2 ~ SA.start + factor(TA.treat.x),
+                 data = amb.S,
+                 na.action = na.omit)
+
+# Perform the likelihood ratio test
+
+#for table: 
+anova(mod.full, mod.null)    #effect of RE
 
 
 ```
-Final Model:
+
+###low salinity
+
+on shell area growth; difference between treatments
 ```{r}
+#quick look at the effect of TA (vs omega?)
+boxplot(low.S$Net_growth.d ~ as.factor(round(low.S$med.ta,-2)))
+
+#MEETING ASSUMPTIONS:
+
+#To test for variance homogeneity among treatment groups in a mixed-effects model, you can use Levene's test or Bartlett's test. These tests compare the variances of the dependent variable (Net_growth.d) across different levels of the factor variable (TA.treat.x) to determine if the variances are approximately equal.
+# Load the necessary packages
+
+# Perform Levene's test for variance homogeneity
+levene_test_result <- leveneTest(Net_growth.d ~ factor(TA.treat.x), data = low.S)
+# Summarize the Levene's test result
+print(levene_test_result)
+
+#does NOT pass test; TRIED TRANSFORMATION (SHIFT TO POS IE +1 AND THEN SQRT OR LOG RESPONSE). NEITHER FIXED ISSUE AND SO AM GIVING WEIGHTED VARIANCE BY TA TREATMENT
+low.S$Net_growth.d.TRANS = as.numeric(log(low.S$Net_growth.d+1))
+
+#Normality: looking for Gaussian distribution
+hist((low.S$Net_growth.d.TRANS)) #looks okay!
+
+#Independence: added in bucket as a random intercept
+
+#model with all predictors. 
+mod.full <- lme((Net_growth.d) ~ SA.start +
+                factor(TA.treat.x),
+                random  = ~1 | bucket,
+                data= (low.S),
+                na.action=na.omit)
+
+mod.wt <- lme((Net_growth.d) ~ SA.start + 
+                factor(TA.treat.x),
+                random  = ~1 | bucket,
+                data= (low.S),
+                na.action=na.omit,
+                weights = varIdent(form = ~ 1 | TA.treat.x))
+anova(mod.full, mod.wt) #improves the model fit; will keep!
+
+#KEEP THE RANDOM EFFECT. 
+
+# Fit the full model with the random effect
+mod.full <- lme(Net_growth.d ~ SA.start + factor(TA.treat.x), random = ~1|bucket,
+                 data = low.S,
+                 na.action = na.omit)
+
+# Fit the null model without the random effect
+mod.null <- gls(Net_growth.d ~ SA.start + factor(TA.treat.x),
+                 data = low.S,
+                 na.action = na.omit)
+
+# Perform the likelihood ratio test
+
+#for table: 
+anova(mod.full, mod.null)    #effect of RE
+
+#for table: 
+anova(mod.full, mod.RE)    #effect of RE
+
+mod.full <- lmer(Net_growth.d.TRANS ~ SA.start + factor(TA.treat.x) + (1 | bucket), data = low.S, na.action = na.omit)
+
+  mod.sa = lmer(Net_growth.d.TRANS ~ factor(TA.treat.x) + (1 | bucket), data = low.S, na.action = na.omit)
+  
+
+#compare the models
+anova(mod.full, mod.sa) #LLR/Chi sq value = 35.729, p = 2.267e-09
+
+low.S$TA.treat.x = as.factor(low.S$TA.treat.x)
+
+#FINAL MODEL
+#for the table parameter estimated
+mod.final = lme((Net_growth.d) ~ SA.start + 
+                factor(TA.treat.x),
+                random  = ~1 | bucket,
+                data= (low.S),
+                na.action=na.omit,
+                weights = varIdent(form = ~ 1 | TA.treat.x))
+r.squaredGLMM(object = mod.final, null = mod.RE)
+     #r2m WHAT WE ARE INTERESTED IN?
+   #r2c
+
+#estimates: 
+summary(mod.final)
+```
+
+on shell mass per area; NO DIFFERENCE
+```{r}
+#quick look at the effect of TA
+boxplot(low.S$thick.mgmm2 ~ as.factor(round(low.S$med.ta,-2)), outline = T)
+
+#MEETING ASSUMPTIONS:
+
+#To test for variance homogeneity among treatment groups in a mixed-effects model, you can use Levene's test or Bartlett's test. These tests compare the variances of the dependent variable (Net_growth.d) across different levels of the factor variable (TA.treat.x) to determine if the variances are approximately equal.
+# Load the necessary packages
+
+# Perform Levene's test for variance homogeneity
+levene_test_result <- leveneTest(thick.mgmm2 ~ factor(TA.treat.x), data = low.S)
+# Summarize the Levene's test result
+print(levene_test_result)
+
+#does NOT pass test; TRIED TRANSFORMATION SQRT OR LOG RESPONSE. NEITHER FIXED ISSUE AND SO AM KEEPING 
+
+low.S$thick.mgmm2.TRANS = sqrt(low.S$thick.mgmm2)
+boxplot(low.S$thick.mgmm2.TRANS ~ as.factor(round(low.S$med.ta,-2)), outline = F)
+# Re-run the test with the transformed response
+levene_test_result <- leveneTest(thick.mgmm2.TRANS ~ factor(TA.treat.x), data = low.S)
+levene_test_result #still DOES NOT PASS; need a fix
+
+#Normality: looking for Gaussian distribution
+hist(log(low.S$thick.mgmm2)) #looks okay!
+
+#Independence: added in bucket as a random intercept
+#model with all predictors. NO DIFFERENCE
+mod.full <- lme((thick.mgmm2) ~ factor(TA.treat.x),
+                random  = ~1 | bucket,
+                data= (low.S),
+                na.action=na.omit)
+#model with all predictors w weights
+mod.wt <- lme((thick.mgmm2) ~ factor(TA.treat.x),
+                random  = ~1 | bucket,
+                data= (low.S),
+                na.action=na.omit,
+                weights = varIdent(form = ~ 1 | TA.treat.x))
+
+anova(mod.full, mod.wt) #significant p-value; we can keep the weighting as it significantly improves the model fit?
+
+#for table: 
+mod.final <- lme((thick.mgmm2) ~ factor(TA.treat.x),
+                random  = ~1 | bucket,
+                data= (low.S),
+                na.action=na.omit,
+                weights = varIdent(form = ~ 1 | TA.treat.x), method = "REML")
+
+r.squaredGLMM(object = mod.final, null = mod.RE)
+     #r2m WHAT WE ARE INTERESTED IN?
+   #r2c
+summary(mod.final)
+
+library(lme4)
+# Fit the full model with the random effect
+mod.full <- lme(thick.mgmm2 ~ SA.start + factor(TA.treat.x), random = ~1|bucket,
+                 data = low.S,
+                 na.action = na.omit)
+
+# Fit the null model without the random effect
+mod.null <- gls(thick.mgmm2 ~ SA.start + factor(TA.treat.x),
+                 data = low.S,
+                 na.action = na.omit)
+
+# Perform the likelihood ratio test
+
+#for table: 
+anova(mod.full, mod.null)    #effect of RE
 
 
-```       
-         
-         MODEL 2: Influence of salinity (just looking at TA between 1800 and 2200 umol kg) on net growth and CI?
+```
+
+###comparing between salinity at TA near ambient
+
 ```{r}
 g = end[end$sal.treat.x == "amb" & end$TA.treat.x == 2000,]
 gg = end[end$sal.treat.x == "low" & end$TA.treat.x == 3000,]
 #ambient salinity
 amb.TA = rbind(g,gg)
+
 ```
+
 on shell growth; HIGHER GROWTH IN LOW s (similar TA and high >2.5 OmC)
 ```{r}
-#looking at the effect of TA (vs omega?)
-boxplot(amb.TA$Net_growth.d ~ amb.TA$sal.treat.x, outline = F)
-# Summary of ANOVA
-anova_model = aov(Net_growth.d ~ sal.treat.x, data = amb.TA)
-summary(anova_model)
-library(agricolae)
-# Perform Tukey's HSD test for the interaction
-tukey <- HSD.test(anova_model, trt = "sal.treat.x", console = TRUE)
+#quick look at the effect of TA (vs omega?)
+boxplot(amb.TA$Net_growth.d ~ as.factor(round(amb.TA$med.S,0)))
 
+
+#model with all predictors. 
+mod.full <- lme((Net_growth.d) ~ SA.start +
+                factor(sal.treat.x),
+                random  = ~1 | bucket,
+                data= (amb.TA),
+                na.action=na.omit)
+
+# Calculate weights based on squared residuals (variance of the error terms)
+mod.full.w <- lme((Net_growth.d) ~ SA.start + 
+                factor(sal.treat.x),
+                random = ~1 | bucket,
+                data = (amb.TA),
+                weights = varIdent(form = ~ 1 | sal.treat.x),  # Use the inverse of squared residuals as weights
+                na.action = na.omit)
+anova(mod.full, mod.full.w)
+
+#it is an improved fit! Good to go.
+
+# Residuals vs. Fitted Values
+plot(mod.full.w)
+
+# Normality of Residuals
+qqnorm(resid(mod.full.w))
+qqline(resid(mod.full.w))
+
+# Homoscedasticity of Residuals
+plot(resid(mod.full.w) ~ fitted(mod.full.w))
+
+
+#Independence: added in bucket as a random intercept
+
+#model with all predictors. 
+mod.full <- lme((Net_growth.d) ~ SA.start + 
+                factor(sal.treat.x),
+                random = ~1 | bucket,
+                data = (amb.TA),
+                weights = varIdent(form = ~ 1 | sal.treat.x),  # Use the inverse of squared residuals as weights
+                na.action = na.omit)
+
+
+summary(mod.full)
+
+#Normality: looking for Gaussian distribution
+hist(resid(mod.full)) #looks okay!
+plot(resid(mod.full) ~ amb.TA$Net_growth.d)
+plot(mod.full) #std resid vs fitted values looks okay!
+
+#KEEP THE RANDOM EFFECT. 
+
+library(lme4)
+# Fit the full model with the random effect
+mod.full <- lme(Net_growth.d ~ SA.start + factor(sal.treat.x), random = ~1|bucket,
+                 data = amb.TA,
+                 na.action = na.omit)
+
+# Fit the null model without the random effect
+mod.null <- gls(Net_growth.d ~ SA.start + factor(sal.treat.x),
+                 data = amb.TA,
+                 na.action = na.omit)
+
+# Perform the likelihood ratio test
+
+#for table: 
+anova(mod.full, mod.null)    #effect of RE
+
+#effect of continuous predictors
+
+mod.full <- lmer(Net_growth.d ~ SA.start + factor(sal.treat.x) + (1 | bucket), data = amb.TA, na.action = na.omit)
+
+  mod.sa = lmer(Net_growth.d ~ factor(sal.treat.x) + (1 | bucket), data = amb.TA, na.action = na.omit)
+
+#compare the models
+anova(mod.full, mod.sa) #LLR/Chi sq value = 25.82, p = 3.749e-07
+
+#FINAL MODEL
+mod.final = lme((Net_growth.d) ~ SA.start + 
+                factor(sal.treat.x),
+                random = ~1 | bucket,
+                data = (amb.TA),
+                weights = varIdent(form = ~ 1 | sal.treat.x),  # Use the inverse of squared residuals as weights
+                na.action = na.omit)
+summary(mod.final)
+
+r.squaredGLMM(object = mod.final, null = mod.RE)
+  #r2m WHAT WE ARE INTERESTED IN?
+ #r2c
 ```
-incremental split on shell growth? 
+
+on shell thickness; NO DIFFERENCE
 ```{r}
-g1 = inc[inc$sal.treat.x == "amb" & inc$TA.treat.x == 2000,]
-gg1 = inc[inc$sal.treat.x == "low" & inc$TA.treat.x == 3000,]
-#ambient salinity
-amb.TAinc = rbind(g1,gg1)
-boxplot(incr_growth.d ~ dps + round(med.S,0), data = amb.TAinc, outline = F)
+#quick look at the effect of TA
+boxplot(amb.TA$thick.mgmm2 ~ as.factor(amb.TA$sal.treat.x), outline = F)
 
-amb.TAinc$sal.treat = as.factor(amb.TAinc$sal.treat.x)
-amb.TAinc$dps.F = as.factor(amb.TAinc$dps)
-library(nlme)
-# Fit the mixed-effects model with two treatment factors
-mixed_model <- lme(incr_growth.d ~ sal.treat * dps.F, random = ~1|bucket, data = amb.TAinc)
+mod.full <- lme((thick.mgmm2) ~ factor(sal.treat.x),
+                random  = ~1 | bucket,
+                data= (amb.TA),
+                na.action=na.omit)
+summary(mod.full)
 
-# Summary of the mixed-effects model
-summary(mixed_model)
-library(multcomp)
-# Perform the post hoc analysis (Tukey's HSD)
-posthoc_results <- glht(mixed_model, linfct = mcp(sal.treat = "Tukey", dps.F = "Tukey"))
 
-# Summary of post hoc analysis
-summary(posthoc_results)
+#MEETING ASSUMPTIONS:
 
-#to figure out the letters for the plot
-# Summary of ANOVA
-anova_model = aov(incr_growth.d ~ sal.treat * dps.F, data = amb.TAinc)
-summary(anova_model)
-library(agricolae)
-# Perform Tukey's HSD test for the interaction
-tukey_interaction <- HSD.test(anova_model, trt = c("sal.treat", "dps"), console = TRUE)
-# Print the results of the Tukey's HSD test for the interaction
-print(tukey_interaction)
+#To test for variance homogeneity among treatment groups in a mixed-effects model, you can use Levene's test or Bartlett's test. These tests compare the variances of the dependent variable (Net_growth.d) across different levels of the factor variable (TA.treat.x) to determine if the variances are approximately equal.
+# Load the necessary packages
 
+# Perform Levene's test for variance homogeneity
+levene_test_result <- leveneTest(thick.mgmm2 ~ factor(sal.treat.x), data = amb.TA)
+# Summarize the Levene's test result
+print(levene_test_result)
+
+#Normality: looking for Gaussian distribution
+hist((amb.TA$thick.mgmm2)) #looks okay!
+
+#Independence: added in bucket as a random intercept
+
+#model with all predictors. NO DIFFERENCE
+mod.full <- lme((thick.mgmm2) ~ factor(sal.treat.x),
+                random  = ~1 | bucket,
+                data= (amb.TA),
+                na.action=na.omit)
+summary(mod.full)
 
 ```
-
          
-         MODEL 3: Effects of [TA] on net growth in reduced salinity
-on shell growth
+        MODEL 2: How does the effect of [TA] on shell growth (surface area) at ambient and lower salinity change over time?
+        
+###ambient salinity
+
+incremental split on shell growth? growth declined in latter half of experiment overall. in the latter half of the experiment the high TA treatment had higher incremental growth than the two low TA treatments
 ```{r}
-low.S = end[end$sal.treat.x == "low",]
+boxplot(incr_growth.d ~ dps + round(med.ta,-3), data = inc[inc$med.S > 31,], outline = F)
 
-library(nlme)
-# Fit the mixed-effects model with one treatment factors
-mixed_model <- lme(incr_growth.d ~ (TA.treat.x), random = ~1|bucket, data = low.S)
+#MEETING ASSUMPTIONS:
 
-# Summary of the mixed-effects model
-summary(mixed_model)
-library(multcomp)
-# Perform the post hoc analysis (Tukey's HSD)
-posthoc_results <- glht(mixed_model, linfct = mcp(TA.treat.x = "Tukey"))
-summary(posthoc_results)
-
-#after 5 weeks of exposure
-boxplot(Net_growth.d ~ TA.treat.x, data = low.S, pch = 19, ylab = NA, xlab = NA, names= NA, frame.plot = F, xlim = c(0,4), axes = F, outline = F, ylim = c(-.2,2))
-lines(x= c(0,0), y=c(-.2,2.5), lwd = 2)
-lines(x= c(0,4), y=c(-.2,-.2), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(1,2,3), labels = c("X","X","X"), cex.axis = 1.15)
-axis(side = 1, line = 0.25, tick = F, at = 2, labels = "Median total alkalinity concentration (umol kg -1)", cex.axis = 1.15)
-axis(side = 1, line = 1.25, tick = F, at = c(1,2,3), labels = c("'Rain'","'Low TA river'","'High TA river'"), cex.axis = 0.8)
-axis(side = 1, line = 2, tick = F, at = 2, labels = "Simulated mixing of freshwater source", cex.axis = 0.8)
-axis(side = 2, line = -1.5, tick = F, at = c(0,.5,1.0,1.5,2), labels = c("0","0.5", "1.0", "1.5","2"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 1.25, tick = F, at = 1, labels = 'Net growth rate', cex.axis = 1.15)
-axis(side = 2, line = -0.25, tick = F, at = 1, labels = expression(paste('(mm'^2,' wk'^-1,')')), cex.axis = 1.15)
-
-text(x = 1, y = 1.5, label = "a", cex = 1.15)
-text(x = 2, y = 1.0, label = "a", cex = 1.15)
-text(x = 3, y = 1.8, label = "b", cex = 1.15)
-
-
-```
-
-incremental split on shell growth? 
-```{r}
-
+#To test for variance homogeneity among treatment groups in a mixed-effects model, you can use Levene's test or Bartlett's test. These tests compare the variances of the dependent variable (Net_growth.d) across different levels of the factor variable (TA.treat.x) to determine if the variances are approximately equal.
+# Load the necessary packages
 inc$dps.F = as.factor(inc$dps)
+# Perform Levene's test for variance homogeneity
+#levene_test_result <- leveneTest(incr_growth.d ~ dps.F, data = inc[inc$sal.treat.x == "amb",])
+# Summarize the Levene's test result
+#print(levene_test_result)
+# Perform Levene's test for variance homogeneity
+#levene_test_result <- leveneTest(incr_growth.d ~ factor(TA.treat.x), data = inc[inc$sal.treat.x == "amb",])
+# Summarize the Levene's test result
+#print(levene_test_result)
 
-low.Sinc = inc[inc$sal.treat.x == "low",]
+#inc$incr_growth.d.TRANS = as.numeric(sqrt(inc$incr_growth.d+5))
 
-low.Sinc$ta.treat = as.factor(low.Sinc$TA.treat.x)
-low.Sinc$dps.F = as.factor(low.Sinc$dps)
-library(nlme)
-# Fit the mixed-effects model with two treatment factors
-mixed_model <- lme(incr_growth.d ~ ta.treat * dps.F, random = ~1|bucket, data = low.Sinc)
+#model with all predictors. 
+mod.full <- lme(incr_growth.d ~ TA.treat.x * dps.F,
+                random  = ~1 | bucket,
+                data= (inc[inc$med.S > 31,]),
+                na.action=na.omit)
 
-# Summary of the mixed-effects model
-summary(mixed_model)
-library(multcomp)
-# Perform the post hoc analysis (Tukey's HSD)
-posthoc_results <- glht(mixed_model, linfct = mcp(ta.treat = "Tukey", dps.F = "Tukey"))
+# Calculate weights based on squared residuals (variance of the error terms)
+mod.full.w <- lme(incr_growth.d ~ TA.treat.x * dps.F,
+                random  = ~1 | bucket,
+                data= (inc[inc$med.S > 31,]),
+                na.action=na.omit,
+                weights = varIdent(form = ~ 1 | TA.treat.x))  # Use the inverse of squared residuals as weights)
+  #it is an improved fit! Good to go.
+anova(mod.full, mod.full.w)
 
-# Summary of post hoc analysis
-summary(posthoc_results)
+# Residuals vs. Fitted Values
+plot(mod.full.w)
 
-#to figure out the letters for the plot
-# Summary of ANOVA
-anova_model = aov(incr_growth.d ~ ta.treat * dps.F, data = low.Sinc)
-summary(anova_model)
-library(agricolae)
-# Perform Tukey's HSD test for the interaction
-tukey_interaction <- HSD.test(anova_model, trt = c("ta.treat", "dps"), console = TRUE)
-# Print the results of the Tukey's HSD test for the interaction
-print(tukey_interaction)
+# Normality of Residuals
+qqnorm(resid(mod.full.w))
+qqline(resid(mod.full.w))
 
-# FIGURE
+# Homoscedasticity of Residuals
+plot(resid(mod.full.w) ~ fitted(mod.full.w))
 
-#incremental growth rates decline in amb TA conditions, suggesting that maybe the effect of altered
-boxplot(incr_growth.d ~ dps : TA.treat.x, pch = 19, ylab = NA, xlab = NA, col = unique(c("grey","grey40")), names= NA, ylim = c(-1,3.6), frame.plot = F, xlim = c(0.5,9), axes = F, data = dat[dat$sal.treat.x == "low",], outline = F)
-text(x = 7.5, y = 2.9, labels = c("Time increment"), cex = 1.25)
-legend(x=6,y=2.85,fill = c("grey","grey40"),legend = c("0 - 18 dps","18 - 36 dps"),bty = "n", cex = 1.2, x.intersp=0.4)
-lines(x= c(0.25,7), y=c(-1,-1), lwd = 2)
-lines(x= c(0.25,0.25), y=c(-1,3.5), lwd = 2)
-axis(side = 1, line = -0.9, tick = F, at = c(1.5,3.5,5.5), labels = c("X","X","X"), cex.axis = 1.1)
-axis(side = 1, line = 0.25, tick = F, at = 3.5, labels = "Median alkalinity concentration (umol kg -1)", cex.axis = 1.1)
-axis(side = 1, line = 1.25, tick = F, at = c(1.5,3.5,5.5), labels = c("'Rain'","'Low TA river'","'High TA river'"), cex.axis = 0.8)
-axis(side = 1, line = 2, tick = F, at = 3.5, labels = "Simulated mixing of freshwater source", cex.axis = 0.8)
-axis(side = 2, line = -0.75, tick = F, at = c(-.5,.5,1.5,2.5,3.5), labels = c("-0.5","0.5","1.5","2.5", "3.5"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 2.1, tick = F, at = 1.25, labels = 'Incremental growth rate', cex.axis = 1.1)
-axis(side = 2, line = 0.75, tick = F, at = 1.25, labels = expression(paste(' (mm'^2,' d'^-1,')')), cex.axis = 1.1)
 
-text(x = c(1,2,3,4,5,6), y = c(2.5,1,1.75,1,3.6,1.6), label = c("b","d","c","d","a","c"), cex = 1.15)
+#Independence: added in bucket as a random intercept
 
-plot(low.S$med.ta ~ low.S$med.OmC)
-unique(round(low.S$med.ta,-2))
-unique(round(low.S$med.OmC,0))
+#model with all predictors. 
+mod.full <- lme(incr_growth.d ~ TA.treat.x * dps.F,
+                random  = ~1 | bucket,
+                data= (inc[inc$med.S > 31,]),
+                na.action=na.omit,
+                weights = varIdent(form = ~ 1 | TA.treat.x))  # Use the inverse of squared residuals as weights)
+
+summary(mod.full)
+
+#Normality: looking for Gaussian distribution
+hist(resid(mod.full)) #looks okay!
+plot(resid(mod.full) ~ amb.TA$Net_growth.d)
+plot(mod.full) #std resid vs fitted values looks okay!
+
+#KEEP THE RANDOM EFFECT. 
+
+library(lme4)
+# Fit the full model with the random effect
+mod.full <- lme(incr_growth.d ~ TA.treat.x * dps.F,
+                random  = ~1 | bucket,
+                data= (inc[inc$med.S > 31,]),
+                na.action=na.omit)
+
+# Fit the null model without the random effect
+mod.null <- gls(incr_growth.d ~ TA.treat.x * dps.F,
+                data= (inc[inc$med.S > 31,]),
+                na.action=na.omit)
+
+# Perform the likelihood ratio test
+
+#for table: 
+anova(mod.full, mod.null)    #effect of RE
+
+
+#compare the models
+anova(mod.full, mod.sa) #LLR/Chi sq value = 25.82, p = 3.749e-07
+
+#FINAL MODEL
+mod.final = lme((Net_growth.d) ~ SA.start + 
+                factor(sal.treat.x),
+                random = ~1 | bucket,
+                data = (amb.TA),
+                weights = varIdent(form = ~ 1 | sal.treat.x),  # Use the inverse of squared residuals as weights
+                na.action = na.omit)
+summary(mod.final)
+
+r.squaredGLMM(object = mod.final, null = mod.RE)
+  #r2m WHAT WE ARE INTERESTED IN?
+ #r2c
 
 ```
-         
-         MODEL 4: effects of TA and S on Gut and CI
+  
+###low salinity
+
+incremental split on area surface area growth? 
+```{r}
+
+boxplot(incr_growth.d ~ dps + round(med.ta,-2), data = inc[inc$med.S < 31,], outline = F)
+
+#MEETING ASSUMPTIONS:
+
+#To test for variance homogeneity among treatment groups in a mixed-effects model, you can use Levene's test or Bartlett's test. These tests compare the variances of the dependent variable (Net_growth.d) across different levels of the factor variable (TA.treat.x) to determine if the variances are approximately equal.
+# Load the necessary packages
+inc$dps.F = as.factor(inc$dps)
+# Perform Levene's test for variance homogeneity
+#levene_test_result <- leveneTest(incr_growth.d ~ dps.F, data = inc[inc$sal.treat.x == "amb",])
+# Summarize the Levene's test result
+#print(levene_test_result)
+# Perform Levene's test for variance homogeneity
+#levene_test_result <- leveneTest(incr_growth.d ~ factor(TA.treat.x), data = inc[inc$sal.treat.x == "amb",])
+# Summarize the Levene's test result
+#print(levene_test_result)
+
+#inc$incr_growth.d.TRANS = as.numeric(sqrt(inc$incr_growth.d+5))
+
+#model with all predictors. 
+mod.full <- lme(incr_growth.d ~ TA.treat.x * dps.F,
+                random  = ~1 | bucket,
+                data= (inc[inc$med.S < 31,]),
+                na.action=na.omit)
+
+# Calculate weights based on squared residuals (variance of the error terms)
+mod.full.w <- lme(incr_growth.d ~ TA.treat.x * dps.F,
+                random  = ~1 | bucket,
+                data= (inc[inc$med.S < 31,]),
+                na.action=na.omit,
+                weights = varIdent(form = ~ 1 | TA.treat.x))  # Use the inverse of squared residuals as weights)
+  #it is an improved fit! Good to go.
+anova(mod.full, mod.full.w)
+
+# Residuals vs. Fitted Values
+plot(mod.full)
+
+# Normality of Residuals
+qqnorm(resid(mod.full))
+qqline(resid(mod.full))
+
+# Homoscedasticity of Residuals
+plot(resid(mod.full) ~ fitted(mod.full))
+
+
+#Independence: added in bucket as a random intercept
+
+#Normality: looking for Gaussian distribution
+hist(resid(mod.full)) #looks okay!
+
+#KEEP THE RANDOM EFFECT. 
+
+library(lme4)
+# Fit the full model with the random effect
+mod.full <- lme(incr_growth.d ~ TA.treat.x * dps.F,
+                random  = ~1 | bucket,
+                data= (inc[inc$med.S < 31,]),
+                na.action=na.omit)
+
+# Fit the null model without the random effect
+mod.null <- gls(incr_growth.d ~ TA.treat.x * dps.F,
+                data= (inc[inc$med.S < 31,]),
+                na.action=na.omit)
+
+# Perform the likelihood ratio test
+
+#for table: 
+anova(mod.full, mod.null)    #effect of RE
+
+
+#compare the models
+anova(mod.full, mod.sa) #LLR/Chi sq value = 25.82, p = 3.749e-07
+
+#FINAL MODEL
+mod.final = lme(incr_growth.d ~ TA.treat.x * dps.F,
+                random  = ~1 | bucket,
+                data= (inc[inc$med.S < 31,]),
+                na.action=na.omit)
+summary(mod.final)
+
+r.squaredGLMM(object = mod.final, null = mod.RE)
+  #r2m WHAT WE ARE INTERESTED IN?
+ #r2c
+
+
+```
+
+        MODEL 3: What is the effect of [TA] on tissue growth at ambient and lower salinity?
+        
+###tissue wt NO EFFECT
+```{r}
+#looking at the effect of TA (vs omega?) on gut
+boxplot(end$gut.wt ~ end$sal.treat.x*end$TA.treat.x, outline = F)
+
+# Perform Levene's test for variance homogeneity
+levene_test_result1 <- leveneTest(gut.wt ~ factor(TA.treat.x), data = end)
+levene_test_result2 <- leveneTest(gut.wt ~ factor(sal.treat.x), data = end)
+# Summarize the Levene's test result  PASSED TEST
+print(c(levene_test_result1, levene_test_result2))
+
+#Normality: looking for Gaussian distribution
+hist(end$gut.wt) #looks okay!
+
+#Independence: added in bucket as a random intercept
+
+#model with all predictors. 
+# Fit the full model
+mod.full <- lme(gut.wt ~ factor(T.), random = ~1 | bucket, data = end, na.action = na.omit)
+
+
+# Perform the ANOVA to test the significance of the factor
+summary(mod.full)
+
+#KEEP THE RANDOM EFFECT. 
+# Fit the mixed-effects model
+mod.full <- lme(gut.wt ~ factor(T.), random  = ~1 | bucket, data= end, na.action=na.omit)
+#Test the significance of random effects (ie; test how much variance is accounted for by REs)
+mod.RE <- gls(gut.wt ~ factor(T.), data= end, na.action=na.omit)
+#mod.test<- gls(sqrt(Richness)~NAP*fExposure,method="REML",data=rikz)#remove the random effect; need to use gls bc lme/lme have to have a RE listed
+#compare the two models; runs Log Likelihood Ratio test to test effect of random effect in model; P VALUE SAYS EFFECT OF BIN IS IMPORTANT.
+
+#bucket does not contribute signifincant variance
+
+#for table: 
+anova(mod.full, mod.RE)    #effect of RE
+
+#FINAL MODEL
+mod.final = lme(gut.wt ~ factor(T.), random  = ~1 | bucket, data= end, na.action=na.omit)
+```
+
+###tissue versus condition index NO EFFECT
 ```{r}
 #looking at the effect of TA (vs omega?) on gut and CI
-boxplot(amb.S$gut.wt ~ as.factor(round(amb.S$med.ta,-3)))
+boxplot(end$CI
+        ~ end$sal.treat.x*end$TA.treat.x, outline = F)
 
-boxplot(amb.S$gut.wt ~ as.factor(round(amb.S$med.OmC,0)))
+# Perform Levene's test for variance homogeneity
+levene_test_result1 <- leveneTest(CI ~ factor(TA.treat.x), data = end)
+levene_test_result2 <- leveneTest(CI ~ factor(sal.treat.x), data = end)
+# Summarize the Levene's test result  PASSED TEST
+print(c(levene_test_result1, levene_test_result2))
 
-boxplot(amb.S$CI ~ as.factor(round(amb.S$med.ta,-3)))
+#Normality: looking for Gaussian distribution
+hist(end$gut.wt) #looks okay!
 
-boxplot(amb.S$CI ~ as.factor(round(amb.S$med.OmC,0)))
+#Independence: added in bucket as a random intercept
 
-#looking at the effect of TA (vs omega?)
-boxplot(amb.TA$gut.wt ~ amb.TA$sal.treat.x, outline = F)
+#model with all predictors. 
+# Fit the full model
+mod.full <- lme(CI ~ factor(T.), random = ~1 | bucket, data = end, na.action = na.omit)
 
-# Fit the mixed-effects model with two treatment factors
-mixed_model <- lme(gut.wt ~ sal.treat.x, random = ~1|bucket, data = amb.TA)
 
-# Summary of the mixed-effects model
-summary(mixed_model)
-library(multcomp)
+# Perform the ANOVA to test the significance of the factor
+summary(mod.full)
 
-#looking at the effect of TA (vs omega?)
-boxplot(amb.TA$CI ~ amb.TA$sal.treat.x, outline = F)
+#KEEP THE RANDOM EFFECT. 
+# Fit the mixed-effects model
+mod.full <- lme(CI ~ factor(T.), random  = ~1 | bucket, data= end, na.action=na.omit)
+#Test the significance of random effects (ie; test how much variance is accounted for by REs)
+mod.RE <- gls(CI ~ factor(T.), data= end, na.action=na.omit)
+#mod.test<- gls(sqrt(Richness)~NAP*fExposure,method="REML",data=rikz)#remove the random effect; need to use gls bc lme/lme have to have a RE listed
+#compare the two models; runs Log Likelihood Ratio test to test effect of random effect in model; P VALUE SAYS EFFECT OF BIN IS IMPORTANT.
 
-# Fit the mixed-effects model with two treatment factors
-mixed_model <- lme(CI ~ sal.treat.x, random = ~1|bucket, data = amb.TA)
+#bucket does contribute signifincant variance
 
-# Summary of the mixed-effects model
-summary(mixed_model)
+#for table: 
+anova(mod.full, mod.RE)    #effect of RE
 
-#looking at the effect of TA (vs omega?) low S
-boxplot(gut.wt ~ TA.treat.x, data = low.S, outline = F)
-#looking at the effect of TA (vs omega?) low S
-boxplot(CI ~ TA.treat.x, data = low.S, outline = F)
-
-# Fit the mixed-effects model with two treatment factors
-mixed_model <- lme(CI ~ TA.treat.x, random = ~1|bucket, data = low.S)
-
-# Summary of the mixed-effects model
-summary(mixed_model)
-
+#FINAL MODEL
+mod.final = lme(gut.wt ~ factor(T.), random  = ~1 | bucket, data= end, na.action=na.omit)
 ```
-        
-         MODEL 5: incremental growth per start SA (dps = 0, dps = 18); survival
-```{r}
-inc$incr_growth.d.mm2 = NA
-inc$SA.mod = NA
-inc[inc$dps == 18,]$incr_growth.d.mm2 = inc[inc$dps == 18,]$incr_growth.d/inc[inc$dps == 18,]$SA.start
-
-inc[inc$dps == 18,]$SA.mod <- (inc[inc$dps == 18,]$SA.start)
-
-inc[inc$dps == 36,]$SA.mod <- (inc[inc$dps == 36,]$SA.dps18)
-
-inc[inc$dps == 36,]$incr_growth.d.mm2 = inc[inc$dps == 36,]$incr_growth.d/inc[inc$dps == 36,]$SA.dps18
-
-
-summary(lme(incr_growth.d.mm2 ~ as.numeric(SA.mod) * as.factor(dps), random = ~1|bucket, data = inc))
-
-
-#Figure 
-boxplot(inc$incr_growth.d.mm2 ~ inc$dps)
-
-
-#extra figure to alter
-plot(inc$incr_growth.d.mm2 ~ inc$SA.mod, bty = "n", type = "n", axes = F, xlim = c(50,300), ylim = c(-0.012,0.03), xlab = NA, ylab = NA)
-
-points((inc[inc$dps == 36,]$incr_growth.d.mm2 ~ inc[inc$dps == 36,]$SA.mod), pch = 21, bg = "grey40")
-points((inc[inc$dps == 18,]$incr_growth.d.mm2 ~ inc[inc$dps == 18,]$SA.mod), pch = 21, bg = "grey")
-lines(x= c(50,300), y=c(-0.012,-0.012), lwd = 2)
-lines(x= c(50,50), y=c(-0.012,0.03), lwd = 2)
-
-axis(side = 1, line = -0.9, tick = F, at = c(53,100,150,200,250,300), labels = c("50","100","150","200","250","300"), cex.axis = 1.1)
-axis(side = 1, line = 0.75, tick = F, at = 175, labels = "Size at start of increment (mm2)", cex.axis = 1.1)
-
-axis(side = 2, line = -1.75, tick = F, at = c(-0.005,0.005,0.015,0.025), labels = c("-0.005","0.005","0.015","0.025"), cex.axis = 1.1, las = 2)
-axis(side = 2, line = 2.25, tick = F, at = 0.01, labels = "incremental per area", cex.axis = 1.1)
-axis(side = 2, line = 1.25, tick = F, at = 0.01, labels = "growth rate (d-1)", cex.axis = 1.1)
-
-lines(x=c(55,300), y=c(0.0063,-0.0007266), lwd = 3, col = "grey", lty = 2) #intercept > 0 but slope == 0
-lines(x=c(55,300), y=c(0.002788592,-0.0045456), lwd = 3, col = "grey40", lty = 2)
-
-```         
-         
-mortality/loss
+      
+      Supplementary info and calculations:
+      
+###mortality/loss
 ```{r}
 mort = dat %>%
   # first sort by year
@@ -511,200 +943,8 @@ axis(side = 1, labels = c("ambient (S = 34)","low (S = 27)"), at = c(3.5,9.5), c
   
 
 ```
-         
-         
-         
-         S, TA, T treatments (make sure the ones we are clustering actually should cluster statistically)
-         
-         
 
-what is the effect of TA on growth rate?
-```{r}
-
-
-boxplot(((amb.S$Net_growth.w)) ~ amb.S$TA.treat.x, pch = 19, ylab = NA, xlab = NA, names= NA, ylim = c(-5,15), frame.plot = F, xlim = c(0,4), axes = F)
-lines(x= c(0,4), y=c(-5,-5), lwd = 2)
-lines(x= c(0,0), y=c(-5,15), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(1,2,3), labels = c("X","X","X"), cex.axis = 1.15)
-axis(side = 1, line = 0.25, tick = F, at = 2, labels = "Median total alkalinity concentration (umol kg -1)", cex.axis = 1.15)
-axis(side = 1, line = 1.25, tick = F, at = c(1,2,3), labels = c("-60%","-17%","+26%"), cex.axis = 0.8)
-axis(side = 1, line = 2, tick = F, at = 2, labels = "Alkalinity change relative to ambient (2250 umol kg-1)", cex.axis = 0.8)
-axis(side = 2, line = -1.5, tick = F, at = c(-5,0,5,10,15), labels = c("-5","0","5", "10", "15"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 1.25, tick = F, at = 5, labels = 'Net surface area growth rate', cex.axis = 1.15)
-axis(side = 2, line = -0.25, tick = F, at = 5, labels = expression(paste('(mm'^2,' wk'^-1,')')), cex.axis = 1.15)
-
-#text(x = 1, y = 10, label = "a", cex = 1.15)
-#text(x = 2, y = 8, label = "a", cex = 1.15)
-#text(x = 3, y = 13, label = "b", cex = 1.15)
-
-```
-what is the effect of TA under low S conditions?
-```{r}
-
-mod = aov((Net_growth.w/SA.start) ~ factor(TA.treat.x), data=low.S, na.action=na.omit)
-TukeyHSD(mod, factor("end$TA.treat.x"))
-plot(TukeyHSD(mod, factor("end$TA.treat.x")))
-
-```
-incremental growth
-```{r}
-dat = dat[dat$dps != 0,]
-#amb salinity
-amb.S = amb.S[amb.S$dps != 0,]
-
-
-##########################
-low.S = low.S[low.S$dps != 0,]
-boxplot(low.S$incr_growth.w ~ low.S$dps : low.S$TA.treat.x, pch = 19, ylab = NA, xlab = NA, col = unique(c("grey","grey40")), names= NA, ylim = c(-7,25), frame.plot = F, xlim = c(0.5,9), axes = F)
-text(x = 7.5, y = 23, labels = c("Exposure period"), cex = 1.25)
-legend(x=6,y=22.5,fill = c("grey","grey40"),legend = c("0 - 18 dps","18 - 36 dps"),bty = "n", cex = 1.2, x.intersp=0.4)
-lines(x= c(0.25,7), y=c(-8,-8), lwd = 2)
-lines(x= c(0.25,0.25), y=c(-8,25), lwd = 2)
-
-axis(side = 1, line = -0.9, tick = F, at = c(1.5,3.5,5.5), labels = c("645","1414","2126"), cex.axis = 1.1)
-axis(side = 1, line = 0.25, tick = F, at = 3.5, labels = "Median total alkalinity concentration (umol kg -1)", cex.axis = 1.1)
-axis(side = 1, line = 1.25, tick = F, at = c(1.5,3.5,5.5), labels = c("'Rain'","'Low TA river'","'High TA river'"), cex.axis = 0.8)
-axis(side = 1, line = 2, tick = F, at = 3.5, labels = "Simulated mixing of freshwater source", cex.axis = 0.8)
-axis(side = 2, line = -0.75, tick = F, at = c(-5,5,15,25), labels = c("-5","5","15","25"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 2.1, tick = F, at = 10, labels = 'Incremental surface area', cex.axis = 1.1)
-axis(side = 2, line = 0.75, tick = F, at = 10, labels = expression(paste('growth rate (mm'^2,' wk'^-1,')')), cex.axis = 1.1)
-
-
-mod = aov(incr_growth.w ~ factor(TA.treat.x) : factor(dps), data=low.S, na.action=na.omit)
-TukeyHSD(mod, factor("TA.treat.x:dps"))
-plot(TukeyHSD(mod, factor("TA.treat.x:dps")))
-```
-
-shell properties + CI
-```{r}
-
-#effect of S
-        #on condition index
-plot(dat$CI ~ jitter(dat$med.ta,5), pch = 19, col = as.factor(dat$sal.treat.x), xlab = "Median [TA] (umol kg -1)", ylab = "Condition Index (dry tissue mass per shell)")
-points(dat[dat$sal.treat.x == "amb",]$CI ~ jitter(dat[dat$sal.treat.x == "amb",]$med.ta,5), pch = 19, cex = 1.2)
-points(dat[dat$sal.treat.x == "low",]$CI ~ jitter(dat[dat$sal.treat.x == "low",]$med.ta,5), pch = 17, cex = 1.2)
-
-boxplot(amb[amb$dps == 36,]$CI ~ amb[amb$dps == 36,]$sal.treat.x, pch = 19, col = "grey40", ylab = NA, xlab = NA, names= NA, ylim = c(0,0.03), frame.plot = F, xlim = c(0,3), axes = F)
-lines(x= c(0,4), y=c(0,0), lwd = 2)
-lines(x= c(0,0), y=c(0,0.03), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(1,2), labels = c("Ambient","Reduced"), cex.axis = 1.25)
-axis(side = 1, line = .5, tick = F, at = 1.5, labels = "Salinity Level", cex.axis = 1.25)
-axis(side = 2, line = -1.75, tick = F, at = c(0,0.0050,0.01,0.015,0.02,0.025,0.03), labels = c("0","0.005","0.01","0.015","0.02","0.025","0.03"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 1.25, tick = F, at = 0.015, labels = 'Condition index (tissue/shell mass)', cex.axis = 1.25)
-        #on organics in shell
-boxplot(amb[amb$dps == 36,]$`%oc.ic.shell` ~ amb[amb$dps == 36,]$sal.treat.x, pch = 19, col = "grey40", ylab = NA, xlab = NA, names= NA, ylim = c(0.5,2), frame.plot = F, xlim = c(0,3), axes = F)
-lines(x= c(0.25,3), y=c(0.5,0.5), lwd = 2)
-lines(x= c(0.25,0.25), y=c(0.5,2), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(1,2), labels = c("Ambient","Reduced"), cex.axis = 1.25)
-axis(side = 1, line = .5, tick = F, at = 1.5, labels = "Salinity Level", cex.axis = 1.25)
-axis(side = 2, line = -3.5, tick = F, at = c(0.5,1,1.5,2), labels = c("0.5","1.0","1.5","2.0"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 0, tick = F, at = 1.25, labels = 'Organic C in shell', cex.axis = 1.25)
-axis(side = 2, line = -1.25, tick = F, at = 1.25, labels = '(% of total shell mass)', cex.axis = 1.25)
-
-#effect of TA
-        #on condition index
-boxplot(amb.S[amb.S$dps == 36,]$CI ~ amb.S[amb.S$dps == 36,]$TA.treat.x, pch = 19, col = "grey40", ylab = NA, xlab = NA, names= NA, ylim = c(0,0.03), frame.plot = F, xlim = c(0,4), axes = F)
-summary(aov(amb.S[amb.S$dps == 36,]$CI ~ amb.S[amb.S$dps == 36,]$TA.treat.x))
-TukeyHSD(aov(amb.S$CI ~ amb.S$TA.treat.x),"amb.S$TA.treat.x")
-lines(x= c(0,4), y=c(0,0), lwd = 2)
-lines(x= c(0,0), y=c(0,0.03), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(1,2,3), labels = c("reduced","ambient","elevated"), cex.axis = 1.25)
-axis(side = 1, line = .5, tick = F, at = 2, labels = "Alkalinity Level", cex.axis = 1.25)
-axis(side = 2, line = -1.75, tick = F, at = c(0,0.0050,0.01,0.015,0.02,0.025,0.03), labels = c("0","0.005","0.01","0.015","0.02","0.025","0.03"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 1.25, tick = F, at = 0.015, labels = 'Condition index (tissue/shell mass)', cex.axis = 1.25)
-        #on organics in shell
-boxplot(amb.S[amb.S$dps == 36,]$`%oc.ic.shell` ~ amb.S[amb.S$dps == 36,]$TA.treat.x, pch = 19, col = "grey40", ylab = NA, xlab = NA, names= NA, ylim = c(0.5,2), frame.plot = F, xlim = c(0,4), axes = F)
-lines(x= c(0.25,4), y=c(0.5,0.5), lwd = 2)
-lines(x= c(0.25,0.25), y=c(0.5,2), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(1,2,3), labels = c("reduced","ambient","elevated"), cex.axis = 1.25)
-axis(side = 1, line = .5, tick = F, at = 2, labels = "Alkalinity Level", cex.axis = 1.25)
-axis(side = 2, line = -3, tick = F, at = c(0.5,1,1.5,2), labels = c("0.5","1.0","1.5","2.0"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 0, tick = F, at = 1.25, labels = 'Organic C in shell', cex.axis = 1.25)
-axis(side = 2, line = -1.25, tick = F, at = 1.25, labels = '(% of total shell mass)', cex.axis = 1.25)
-
-#effect of TA in simulated freshwater events
-        #on condition index
-boxplot(low.S[low.S$dps == 36,]$CI ~ low.S[low.S$dps == 36,]$TA.treat.x, pch = 19, col = "grey40", ylab = NA, xlab = NA, names= NA, ylim = c(0,0.03), frame.plot = F, xlim = c(0,4), axes = F)
-summary(aov(low.S[low.S$dps == 36,]$CI ~ factor(low.S[low.S$dps == 36,]$TA.treat.x)))
-TukeyHSD(aov(low.S$CI ~ low.S$TA.treat.x),"low.S$TA.treat.x")
-lines(x= c(0,4), y=c(0,0), lwd = 2)
-lines(x= c(0,0), y=c(0,0.03), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(1,2,3), labels = c("rain","low TA","high TA"), cex.axis = 1.25)
-axis(side = 1, line = .5, tick = F, at = 2, labels = "Alkalinity Level", cex.axis = 1.25)
-axis(side = 2, line = -1.75, tick = F, at = c(0,0.0050,0.01,0.015,0.02,0.025,0.03), labels = c("0","0.005","0.01","0.015","0.02","0.025","0.03"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 1.25, tick = F, at = 0.015, labels = 'Condition index (tissue/shell mass)', cex.axis = 1.25)
-            #on organics in shell
-boxplot(low.S[low.S$dps == 36,]$`%oc.ic.shell` ~ low.S[low.S$dps == 36,]$TA.treat.x, pch = 19, col = "grey40", ylab = NA, xlab = NA, names= NA, ylim = c(0.5,2), frame.plot = F, xlim = c(0,4), axes = F)
-lines(x= c(0.25,4), y=c(0.5,0.5), lwd = 2)
-lines(x= c(0.25,0.25), y=c(0.5,2), lwd = 2)
-axis(side = 1, line = -1, tick = F, at = c(1,2,3), labels = c("rain","low TA","high TA"), cex.axis = 1.25)
-axis(side = 1, line = .5, tick = F, at = 2, labels = "Simulated FW exposure", cex.axis = 1.25)
-axis(side = 2, line = -3, tick = F, at = c(0.5,1,1.5,2), labels = c("0.5","1.0","1.5","2.0"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 0, tick = F, at = 1.25, labels = 'Organic C in shell', cex.axis = 1.25)
-axis(side = 2, line = -1.25, tick = F, at = 1.25, labels = '(% of total shell mass)', cex.axis = 1.25)
-```
-
-linear model tries
-```{r}
-
-library(nlme)
-library(lme4)
-library(emmeans)
-
-#transforming the data by making all values positive (adding 27 to the y)
-dat$Net_growth.trans = dat$Net_growth/5 + 20
-dat.36 = as.data.frame(dat[dat$dps == 36,])
-
-mod.full = lme((CI) ~ med.ta + med.S , random = ~1|bucket, data = dat.36, na.action = na.exclude)
-summary(mod.full)
-
-mod.full = lme((Net_growth/5) ~ med.ta + med.S , random = ~1|bucket, data = dat.36, na.action = na.exclude)
-summary(mod.full) #effect of TA only on net growth rate; did not change in lower salinity.
-
-plot(dat.36$Net_growth/5 ~ dat.36$med.ta, col = as.factor(dat.36$sal.treat.x), pch = 19, xlab = NA, ylab = NA, bty = "n", frame.plot = F, axes = F, ylim = c(-5,12), xlim = c(400,3000))
-lines(x= c(400,3500), y=c(-5,-5), lwd = 2)
-lines(x= c(400,400), y=c(-5,15), lwd = 2)
-lines(x= c(2250,2250), y= c(-4.8,15), lwd = 2, lty = 2, col = "grey72")
-axis(side = 1, line = -1, tick = F, at = c(500,1000,1500,2000,2500,3000), labels = c("500","1000","1500","2000","2500","3000"), cex.axis = 1.15)
-axis(side = 1, line = 0.5, tick = F, at = 1750, labels = "Median total alkalinity concentration (umol kg -1)", cex.axis = 1.15)
-points(dat.36[dat.36$sal.treat.x == "amb",]$Net_growth/5 ~ jitter(dat.36[dat.36$sal.treat.x == "amb",]$med.ta,10), col = "black", pch = 19, cex = 1.2)
-points(dat.36[dat.36$sal.treat.x == "low",]$Net_growth/5 ~ jitter(dat.36[dat.36$sal.treat.x == "low",]$med.ta,10), col = "black", pch = 17, cex = 1.2)
-
-axis(side = 2, line = -1.5, tick = F, at = c(-4.2,0.5,5,10,15), labels = c("-5","0","5", "10", "15"), cex.axis = 1.25, las = 1)
-axis(side = 2, line = 1.25, tick = F, at = 2.5, labels = 'Net surface area growth rate', cex.axis = 1.15)
-axis(side = 2, line = -0.25, tick = F, at = 2.5, labels = expression(paste('(mm'^2,' wk'^-1,')')), cex.axis = 1.15)
-
-
-
-#summary(lm((Net_growth/5) ~ med.ta + med.S, data = dat.36))
-
-#abline(0,0.0009965, lwd = 2, col = "black")
-
-
-
-
-
-# histograms of response variable(s); look for gaussian distribution
-
-hist(sqrt(dat.36$Net_growth.trans))
-
-#plot response variable by each of the predictors; look at spread of data
-plot(sqrt(dat.36$Net_growth.trans) ~ (dat.36$med.S), pch = 19)
-plot(sqrt(dat.36$Net_growth.trans) ~ (dat.36$med.ta), pch = 19)
-
-#was pH important to consider? 
-plot(dat.36$med.pH ~ dat.36$med.ta,col = as.factor(dat.36$sal.treat.x), pch = 19, cex = 1.5)
-
-library(seacarb)
-dat.36$om_cal = carb(flag = 8, var1 = dat.36$med.pH, var2 = dat.36$med.ta/(10^6), S = dat.36$med.S, T = 14)$OmegaCalcite
-plot(dat.36$om_cal ~ dat.36$med.ta,col = as.factor(dat.36$sal.treat.x), pch = 19, cex = 1.5)
-
-
-mod.full = lme(log(Net_growth.trans) ~ med.ta + med.S, random = ~1|bucket, data = dat.36, na.action = na.exclude)
-summary(mod.full)
-```
-
-looking at the control; differences from control
+###patterns of controls for ablines in figures...NOT DONE
 ```{r}
 # SHELL WEIGHT 
 plot(control$shell.wt~control$SA.mm2)
@@ -746,20 +986,37 @@ summary(lm(end$CI ~ factor(round(end$med.ta,-2))))
 
 ```
 
-
-FIGURES -----------------------
-
-FIG 1 : powerpoint schematic
-
-
-FIG 2 : treatment conditions (4 panel made separately and then spliced together)
-treatment conditions
+###average shell area, tissue mass, CI
 ```{r}
+m.gut = mean(end$gut.wt)
+se.gut = mean(end$gut.wt)/sqrt(nrow(end))
 
+m.gut2 = mean(control$gut.wt)
+se.gut2 = mean(control$gut.wt/sqrt(nrow(control)))
+
+m.ci = mean(end$CI)
+se.ci = mean(end$CI)/sqrt(nrow(end))
+
+m.ci2 = mean(control$gut.wt/control$shell.wt)
+se.ci2 = mean((control$gut.wt/control$shell.wt)/sqrt(nrow(control)))
+
+m.area = mean(end$SA.mm2.RE)
+se.area = mean(end$SA.mm2.RE)/sqrt(nrow(end))
+
+m.area2 = mean(control$SA.mm2)
+se.area2 = mean(control$SA.mm2/sqrt(nrow(control)))
+
+```
+
+
+      FIGURES:
+
+###Figure 2: treatment conditions
+summarizing conditions first
+```{r}
 median.sw.conditions <- sw %>%
   group_by(Date, `Bucket#`) %>%
   summarize(med_TA = median(TA), med_S = median(S), med_pH = median(pH), med_T = median(T_c), S.treat = NA, TA.treat = NA)
-
 
 median.sw.conditions[median.sw.conditions$med_S > 30,]$S.treat <- 34
 median.sw.conditions[median.sw.conditions$med_S < 30,]$S.treat <- 27
@@ -770,8 +1027,11 @@ median = median.sw.conditions %>%
   group_by(`Bucket#`) %>%
   summarize(med.TA = median(med_TA), med.S = median(med_S), med.T = median(med_T), med.pH = median(med_pH))
 
-par(mfrow = c(2,1), mar = c(2, 4, 1.5, 2))
+par(mfrow = c(1,1), mar = c(4, 5, 1.5, 2))
 
+```
+now for the figures...
+```{r}
 ############Total alkalinity monitoring
 
 #amb sal
@@ -783,22 +1043,44 @@ plot(med_TA ~ Date,
      las = 1,
      xlab = NA,
      ylab = NA,
-     xaxt='n')
-abline(h = c(967,942,1969,1941,2900,2916), col = c("grey","grey","skyblue1", "skyblue1", "goldenrod1", "goldenrod1"), lwd = 2, lty = 2)
-points(med_TA ~ Date, data = median.sw.conditions[median.sw.conditions$S.treat == 34,], pch = 19, col = "black", cex = 1.1)
-#low sal
-plot(med_TA ~ Date, 
-     data = median.sw.conditions[median.sw.conditions$S.treat == 27,],
-     pch = 17,
-     col = "black",
-     ylim = c(500,2500),
-     las = 1,
-     xlab = NA,
-     ylab = NA)
-abline(h = c(783,798,1499,1470,2212,2185), col = c("grey24", "grey24","blue4", "blue4","green4","green4"), lwd = 2, lty = 2)
-points(med_TA ~ Date, data = median.sw.conditions[median.sw.conditions$S.treat == 27,], pch = 17, col = "black", cex = 1.1)
+     xaxt='n',
+     bty = 'n',
+     axes = F,
+     xlim=c(as.Date("2022-08-02"),as.Date("2022-09-05")))
 
-par(mfrow = c(1,1))
+#ambient salinity treatments
+lines(x=c(as.Date("2022-08-02"),as.Date("2022-09-05")), y = c(967,967), lwd = 2, lty = 2, col = "grey")
+lines(x=c(as.Date("2022-08-02"),as.Date("2022-09-05")), y = c(942,942), lwd = 2, lty = 2, col = "grey")
+lines(x=c(as.Date("2022-08-02"),as.Date("2022-09-05")), y = c(1969,1969), lwd = 2, lty = 2, col = "skyblue1")
+lines(x=c(as.Date("2022-08-02"),as.Date("2022-09-05")), y = c(1941,1941), lwd = 2, lty = 2, col = "skyblue1")
+lines(x=c(as.Date("2022-08-02"),as.Date("2022-09-05")), y = c(2900,2900), lwd = 2, lty = 2, col = "goldenrod1")
+lines(x=c(as.Date("2022-08-02"),as.Date("2022-09-05")), y = c(2916,2916), lwd = 2, lty = 2, col = "goldenrod1")
+
+points(med_TA ~ as.Date(Date), data = median.sw.conditions[median.sw.conditions$S.treat == 34,], pch = 19, col = "black", cex = 1.25)
+
+#low salinity treatments
+lines(x=c(as.Date("2022-08-02"),as.Date("2022-09-05")), y = c(783,783), lwd = 2, lty = 2, col = "grey24")
+lines(x=c(as.Date("2022-08-02"),as.Date("2022-09-05")), y = c(798,798), lwd = 2, lty = 2, col = "grey24")
+lines(x=c(as.Date("2022-08-02"),as.Date("2022-09-05")), y = c(1499,1499), lwd = 2, lty = 2, col = "blue4")
+lines(x=c(as.Date("2022-08-02"),as.Date("2022-09-05")), y = c(1470,1470), lwd = 2, lty = 2, col = "blue4")
+lines(x=c(as.Date("2022-08-02"),as.Date("2022-09-05")), y = c(2212,2212), lwd = 2, lty = 2, col = "green4")
+lines(x=c(as.Date("2022-08-02"),as.Date("2022-09-05")), y = c(2185,2185), lwd = 2, lty = 2, col = "green4")
+
+points(med_TA ~ as.Date(Date), data = median.sw.conditions[median.sw.conditions$S.treat == 27,], pch = 17, col = "black", cex = 1.25)
+
+
+lines(x=c(as.Date("2022-08-01"),as.Date("2022-09-05")), y=c(500,500), lwd = 2)
+lines(x=c(as.Date("2022-08-01"),as.Date("2022-08-01")), y=c(500,3500), lwd = 2)
+
+axis(side = 1, line = -1, at = c(as.Date("2022-08-05"), as.Date("2022-08-18"), as.Date("2022-08-30")), labels = c("Aug 03","Aug 18","Sept 02"), cex.axis = 1.15, tick = F)
+
+axis(side = 1, line = 0.25, tick = F, at = as.Date("2022-08-18"), labels = "Date", cex.axis = 1.25)
+
+axis(side = 2, line = -1, tick = F, at = c(1000,2000,3000), labels = c("1000","2000","3000"), cex.axis = 1.25, las = 1)
+
+axis(side = 2, line = 2.5, tick = F, at = 2000, labels = 'Total alkalinity ', cex.axis = 1.15)
+axis(side = 2, line = 1.25, tick = F, at = 2000, labels = expression(paste('(umol kg'^-1,')')), cex.axis = 1.15)
+
 # Create an empty plot (blank screen)
 plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1))
 # Add legend for S treatment
@@ -806,37 +1088,203 @@ legend("topleft", legend = unique(median.sw.conditions$S.treat), col = "black", 
 
 data_sorted <- median[order(median$med.TA),]
 # Add legend for TA treatment
-legend("topright", legend = c(round(data_sorted$med.TA),0), col = c("grey24", "grey24","grey","grey","blue4", "blue4", "skyblue1", "skyblue1","green4","green4", "goldenrod1", "goldenrod1"), pch = 15, title = "Median [TA]", cex = 1.1, pt.cex = 2)
+legend("topright", legend = c(783,798,967,942,
+  1470,1499,1969,1942,
+  2185,2212,2900,2916), col = c("grey24", "grey24","grey","grey","blue4", "blue4", "skyblue1", "skyblue1","green4","green4", "goldenrod1", "goldenrod1"), pch = 15, title = "Average TA", cex = 1.1, pt.cex = 2)
 
 ############Temperature monitoring
 
-plot(median.sw.conditions$med_T ~ median.sw.conditions$Date, pch = 18, col = "black", ylim = c(10,25), cex = 1, data = median.sw.conditions, ylab = "Temperature C", xlab = "Date")
+plot(med_T ~ as.Date(Date), 
+     data = median.sw.conditions,
+     pch = 18,
+     col = "black",
+     las = 1,
+     xlab = NA,
+     ylab = NA,
+     xaxt='n',
+     bty = 'n',
+     axes = F,
+     ylim = c(10,30),
+     xlim=c(as.Date("2022-08-02"),as.Date("2022-09-05")))
 
-points(median.sw.conditions[median.sw.conditions$S.treat == 27,]$med_T ~ median.sw.conditions[median.sw.conditions$S.treat == 27,]$Date, pch = 17, col = "black", cex = 1.1)
+points(med_T ~ as.Date(Date), data = median.sw.conditions[median.sw.conditions$S.treat == 34,], pch = 19, col = "black", cex = 1.25)
+points(med_T ~ as.Date(Date), data = median.sw.conditions[median.sw.conditions$S.treat == 27,], pch = 17, col = "black", cex = 1.25)
 
-points(med_T ~ Date, data = median.sw.conditions[median.sw.conditions$S.treat == 34,], pch = 19, col = "black", cex = 1.1)
+lines(x=c(as.Date("2022-08-01"),as.Date("2022-09-05")), y=c(10,10), lwd = 2)
+lines(x=c(as.Date("2022-08-01"),as.Date("2022-08-01")), y=c(10,23), lwd = 2)
+
+axis(side = 2, line = -1, tick = F, at = c(11,16,21), labels = c("10","15","20"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = 1.25, tick = F, at = 16.5, labels = "Temperature (C)", cex.axis = 1.15)
+
+axis(side = 1, line = -1, at = c(as.Date("2022-08-05"), as.Date("2022-08-18"), as.Date("2022-08-30")), labels = c("Aug 03","Aug 18","Sept 02"), cex.axis = 1.15, tick = F)
+
+axis(side = 1, line = 0.25, tick = F, at = as.Date("2022-08-18"), labels = "Date", cex.axis = 1.25)
 
 ############Salinity monitoring
 
-plot(median.sw.conditions$med_S ~ median.sw.conditions$Date, pch = 18, col = "black", ylim = c(20,35), cex = 1, data = median.sw.conditions, ylab = "Salinity", xlab = "Date")
+plot(med_S ~ as.Date(Date), 
+     data = median.sw.conditions,
+     pch = 18,
+     col = "black",
+     las = 1,
+     xlab = NA,
+     ylab = NA,
+     xaxt='n',
+     bty = 'n',
+     axes = F,
+     ylim = c(24,36),
+     xlim=c(as.Date("2022-08-02"),as.Date("2022-09-05")))
 
-points(median.sw.conditions[median.sw.conditions$S.treat == 27,]$med_S ~ median.sw.conditions[median.sw.conditions$S.treat == 27,]$Date, pch = 17, col = "black", cex = 1.25)
+points(med_S ~ as.Date(Date), data = median.sw.conditions[median.sw.conditions$S.treat == 34,], pch = 19, col = "black", cex = 1.25)
+points(med_S ~ as.Date(Date), data = median.sw.conditions[median.sw.conditions$S.treat == 27,], pch = 17, col = "black", cex = 1.25)
 
-points(med_S ~ Date, data = median.sw.conditions[median.sw.conditions$S.treat == 34,], pch = 19, col = "black", cex = 1.25)
+lines(x=c(as.Date("2022-08-01"),as.Date("2022-09-05")), y=c(24,24), lwd = 2)
+lines(x=c(as.Date("2022-08-01"),as.Date("2022-08-01")), y=c(24,38), lwd = 2)
 
-############pH monitoring
+axis(side = 2, line = -1, tick = F, at = c(27,34), labels = c("27","34"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = 1.5, tick = F, at = 29, labels = "Salinity", cex.axis = 1.15)
+
+axis(side = 1, line = -1, at = c(as.Date("2022-08-05"), as.Date("2022-08-18"), as.Date("2022-08-30")), labels = c("Aug 03","Aug 18","Sept 02"), cex.axis = 1.15, tick = F)
+
+axis(side = 1, line = 0.25, tick = F, at = as.Date("2022-08-18"), labels = "Date", cex.axis = 1.25)
 
 
 ```
 
+###Figure 3:what is the effect of TA on surface area growth rate?
+```{r}
+boxplot(((amb.S$Net_growth.d)) ~ amb.S$TA.treat.x, pch = 19, ylab = NA, xlab = NA, names= NA, ylim = c(-0.6,1.8), frame.plot = F, xlim = c(0.25,4), axes = F)
+lines(x= c(0.25,4), y=c(-0.6,-0.6), lwd = 2)
+lines(x= c(0.25,0.25), y=c(-0.6,3), lwd = 2)
+axis(side = 1, line = -1.25, tick = F, at = c(1,2,3), labels = c("'low'","~'ambient'","'high'"), cex.axis = 1.1)
+axis(side = 1, line = 0.25, tick = F, at = 2, labels = "Total alkalinity condition", cex.axis = 1.15)
+axis(side = 2, line = -1.5, tick = F, at = c(-0.5,0,0.5,1.0,1.5), labels = c("-0.5","0","0.5", "1.0", "1.5"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = 1.75, tick = F, at = 0.5, labels = 'Net surface area growth rate', cex.axis = 1.15)
+axis(side = 2, line = 0.2, tick = F, at = 0.5, labels = expression(paste('(mm'^2,' d'^-1,')')), cex.axis = 1.15)
 
-FIG 3 : what is the effect of TA on growth rate?
+```
 
-FIG 4 : what is the effect of TA on growth under low S conditions?
+###Figure 4: Effect of TA in lower S on surface area growth rate?
+```{r}
+boxplot(Net_growth.d ~ TA.treat.x, pch = 19, ylab = NA, xlab = NA, names= NA, ylim = c(-0.6,1.7), frame.plot = F, xlim = c(0.25,4), axes = F, data = low.S, outline = F)
+lines(x= c(0.25,4), y=c(-0.6,-0.6), lwd = 2)
+lines(x= c(0.25,0.25), y=c(-0.6,3), lwd = 2)
+axis(side = 1, line = -1.25, tick = F, at = c(1,2,3), labels = c("'DI'","'low TA'","'high TA'"), cex.axis = 1.1)
+axis(side = 1, line = 0.25, tick = F, at = 2, labels = "Fresh water source", cex.axis = 1.15)
+axis(side = 2, line = -1.5, tick = F, at = c(-0.5,0,0.5,1.0,1.5), labels = c("-0.5","0","0.5", "1.0", "1.5"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = 1.75, tick = F, at = 0.5, labels = 'Net surface area growth rate', cex.axis = 1.15)
+axis(side = 2, line = 0.2, tick = F, at = 0.5, labels = expression(paste('(mm'^2,' d'^-1,')')), cex.axis = 1.15)
 
-FIG 5 : what is the effect of TA on CI under low S conditions?
+text(x = 1, y = 1.25, label = "a", cex = 1.15)
+text(x = 2, y = 0.75, label = "a", cex = 1.15)
+text(x = 3, y = 1.7, label = "b", cex = 1.15)
+```
 
-FIG 6 : Incremental growth in ambient S comparing TA treatments
+###Figure 5: Incremental shell growth (all treatments; two plots pasted side by side after)
+```{r}
 
-FIG 7 : Incremental growth in low S comparing TA treatments
+#incremental growth rates decline in amb TA conditions, suggesting that maybe the effect of altered
+boxplot(incr_growth.d ~ dps : TA.treat.x, ylab = NA, xlab = NA, col = unique(c("grey","grey40")), names= NA, ylim = c(-1,3.6), frame.plot = F, xlim = c(0.5,9), axes = F, data = dat[dat$sal.treat.x == "amb",], outline = F)
+#text(x = 7.5, y = 2.9, labels = c("Time increment"), cex = 1.25)
+#legend(x=6,y=2.85,fill = c("grey","grey40"),legend = c("0 - 18 dps","18 - 36 dps"),bty = "n", cex = 1.2, x.intersp=0.4)
+lines(x= c(0.25,7), y=c(-1,-1), lwd = 2)
+lines(x= c(0.25,0.25), y=c(-1,3.5), lwd = 2)
+axis(side = 1, line = -0.9, tick = F, at = c(1.5,3.5,5.5), labels = c("'low'","~'ambient'","'high'"), cex.axis = 1.1)
+axis(side = 1, line = 0.25, tick = F, at = 3.5, labels = "Total alkalinity condition", cex.axis = 1.1)
 
+axis(side = 2, line = -0.75, tick = F, at = c(-.5,.5,1.5,2.5,3.5), labels = c("-0.5","0.5","1.5","2.5", "3.5"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = 2.1, tick = F, at = 1.25, labels = 'Incremental growth rate', cex.axis = 1.1)
+axis(side = 2, line = 0.75, tick = F, at = 1.25, labels = expression(paste(' (mm'^2,' d'^-1,')')), cex.axis = 1.1)
+
+text(x = c(1,3,5), y = c(3.5,2.75,2.5), label = "a", cex = 1.15)
+text(x = 6, y = 1.75, label = "b", cex = 1.15)
+text(x = c(2,4), y = c(1,1.5), label = "c", cex = 1.15)
+
+
+
+#LOW SALINITY
+#incremental growth rates decline in amb TA conditions, suggesting that maybe the effect of altered
+boxplot(incr_growth.d ~ dps : TA.treat.x, pch = 19, ylab = NA, xlab = NA, col = unique(c("grey","grey40")), names= NA, ylim = c(-1,3.6), frame.plot = F, xlim = c(0.5,9), axes = F, data = dat[dat$sal.treat.x == "low",], outline = F)
+text(x = 7.5, y = 2.9, labels = c("Time increment"), cex = 1.25)
+legend(x=6,y=2.85,fill = c("grey","grey40"),legend = c("0 - 18 dps","18 - 36 dps"),bty = "n", cex = 1.2, x.intersp=0.4)
+lines(x= c(0.25,7), y=c(-1,-1), lwd = 2)
+lines(x= c(0.25,0.25), y=c(-1,3.5), lwd = 2)
+axis(side = 1, line = -0.9, tick = F, at = c(1.5,3.5,5.5), labels = c("'DI'","'Low TA'","'High TA'"), cex.axis = 1.1)
+axis(side = 1, line = 0.25, tick = F, at = 3.5, labels = "Total alkalinity condition", cex.axis = 1.1)
+
+axis(side = 2, line = -0.75, tick = F, at = c(-.5,.5,1.5,2.5,3.5), labels = c("-0.5","0.5","1.5","2.5", "3.5"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = 2.1, tick = F, at = 1.25, labels = 'Incremental growth rate', cex.axis = 1.1)
+axis(side = 2, line = 0.75, tick = F, at = 1.25, labels = expression(paste(' (mm'^2,' d'^-1,')')), cex.axis = 1.1)
+
+text(x = c(1,2,3,4,5,6), y = c(2.5,1,1.75,1,3.6,1.6), label = c("b","d","c","d","a","c"), cex = 1.15)
+```
+
+###extra/supplementary?
+CI
+```{r}
+#effect of TA and amb on condition index
+boxplot(CI ~ TA.treat.x, data = amb.S, outline = F,ylim = c(0.005,0.03), ylab = NA, xlab = NA, names= NA, frame.plot = F, xlim = c(0.25,3.5), axes = F)
+lines(x= c(0.25,4), y=c(0.005,0.005), lwd = 2)
+lines(x= c(0.25,0.25), y=c(0.005,0.03), lwd = 2)
+axis(side = 1, line = -1.25, tick = F, at = c(1,2,3), labels = c("'low'","~'ambient'","'high'"), cex.axis = 1.1)
+axis(side = 1, line = 0.25, tick = F, at = 2, labels = "Total alkalinity condition", cex.axis = 1.15)
+axis(side = 2, line = -1.5, tick = F, at = c(0.006,0.0105,0.015,0.02,0.025,0.03), labels = c("0.005","0.01","0.015","0.02","0.025","0.03"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = 1.5, tick = F, at = 0.0175, labels = 'Condition index (tissue/shell mass)', cex.axis = 1.25)
+        
+#effect of TA on condition index low salinity
+boxplot(CI ~ TA.treat.x, data = low.S, outline = F,ylim = c(0.005,0.03), ylab = NA, xlab = NA, names= NA, frame.plot = F, xlim = c(0.25,3.5), axes = F)
+lines(x= c(0.25,4), y=c(0.005,0.005), lwd = 2)
+lines(x= c(0.25,0.25), y=c(0.005,0.03), lwd = 2)
+axis(side = 1, line = -1.25, tick = F, at = c(1,2,3), labels = c("'DI'","'Low TA'","'High TA'"), cex.axis = 1.1)
+axis(side = 1, line = 0.25, tick = F, at = 2, labels = "Total alkalinity condition", cex.axis = 1.15)
+axis(side = 2, line = -1.5, tick = F, at = c(0.006,0.0105,0.015,0.02,0.025,0.03), labels = c("0.005","0.01","0.015","0.02","0.025","0.03"), cex.axis = 1.25, las = 1)
+axis(side = 2, line = 1.5, tick = F, at = 0.0175, labels = 'Condition index (tissue/shell mass)', cex.axis = 1.25)
+
+```
+
+
+Seawater table with carbonate system parameters listed for each treatment (ave +- SE)
+```{r}
+plot(end$med.OmC
+     )
+
+```
+
+#not significant; incremental growth per start area (dps = 0, dps = 18); survival
+```{r}
+inc$incr_growth.d.mm2 = NA
+inc$SA.mod = NA
+inc[inc$dps == 18,]$incr_growth.d.mm2 = inc[inc$dps == 18,]$incr_growth.d/inc[inc$dps == 18,]$SA.start
+
+inc[inc$dps == 18,]$SA.mod <- (inc[inc$dps == 18,]$SA.start)
+
+inc[inc$dps == 36,]$SA.mod <- (inc[inc$dps == 36,]$SA.dps18)
+
+inc[inc$dps == 36,]$incr_growth.d.mm2 = inc[inc$dps == 36,]$incr_growth.d/inc[inc$dps == 36,]$SA.dps18
+
+
+summary(lme(incr_growth.d.mm2 ~ as.numeric(SA.mod) * as.factor(dps), random = ~1|bucket, data = inc))
+
+
+#Figure 
+boxplot(inc$incr_growth.d.mm2 ~ inc$dps)
+
+
+#extra figure to alter
+plot(inc$incr_growth.d.mm2 ~ inc$SA.mod, bty = "n", type = "n", axes = F, xlim = c(50,300), ylim = c(-0.012,0.03), xlab = NA, ylab = NA)
+
+points((inc[inc$dps == 36,]$incr_growth.d.mm2 ~ inc[inc$dps == 36,]$SA.mod), pch = 21, bg = "grey40")
+points((inc[inc$dps == 18,]$incr_growth.d.mm2 ~ inc[inc$dps == 18,]$SA.mod), pch = 21, bg = "grey")
+lines(x= c(50,300), y=c(-0.012,-0.012), lwd = 2)
+lines(x= c(50,50), y=c(-0.012,0.03), lwd = 2)
+
+axis(side = 1, line = -0.9, tick = F, at = c(53,100,150,200,250,300), labels = c("50","100","150","200","250","300"), cex.axis = 1.1)
+axis(side = 1, line = 0.75, tick = F, at = 175, labels = "Size at start of increment (mm2)", cex.axis = 1.1)
+
+axis(side = 2, line = -1.75, tick = F, at = c(-0.005,0.005,0.015,0.025), labels = c("-0.005","0.005","0.015","0.025"), cex.axis = 1.1, las = 2)
+axis(side = 2, line = 2.25, tick = F, at = 0.01, labels = "incremental per area", cex.axis = 1.1)
+axis(side = 2, line = 1.25, tick = F, at = 0.01, labels = "growth rate (d-1)", cex.axis = 1.1)
+
+lines(x=c(55,300), y=c(0.0063,0.0063), lwd = 3, col = "grey", lty = 2) #intercept > 0 but slope == 0
+lines(x=c(55,300), y=c(0.002788592,-0.0045456), lwd = 3, col = "grey40", lty = 2)
+```

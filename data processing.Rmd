@@ -30,7 +30,7 @@ library(seacarb)
 
 seacarb for carbonate system estimates; need to get data from other computer*
 ```{r}
-#inputting another column for salinity
+#inputting another column for pH spec
 
 sw$ph.spec = NA
 sw[sw$S > 31,]$ph.spec <- round((0.0221*sw[sw$S > 31,]$pH.mV) + 6.6854,2)
@@ -51,6 +51,13 @@ sw$PCO2= carb(flag = 8, var1 = sw$ph.spec, var2 = sw$TA/10^6, T = sw$T_c, S = sw
 ```
 calculating median values for sw treatments to apply to the plates (pH, TA, and S); mass.full saved as df
 ```{r}
+
+sw.control = subset(sw,
+            `Bucket#` == 7|
+            `Bucket#`== 14)
+plot(sw.control$ph.spec ~ sw.control$Date, col = as.factor(sw.control$fresh_old), pch = 19)
+  points(ph.spec ~ Date, col = as.factor(fresh_old), data = sw.control[sw.control$`Bucket#` == 7,], pch = 19, cex = 1.5)
+    points(ph.spec ~ Date, col = as.factor(fresh_old), data = sw.control[sw.control$`Bucket#` == 14,], pch = 19, cex = 1.5)
 
 sw2 = subset(sw, 
             `Bucket#` != 7 &
@@ -214,7 +221,8 @@ dat = subset(full,
              `%oc.ic.shell` > 0 &
                CV_ID != 526&
                CV_ID != 536&
-               CV_ID != 538)
+               CV_ID != 538 &
+              shell.wt < 850)
 dat.ids = unique(dat[dat$dps == 36,]$CV_ID)
 # Subset dat dataframe based on CV_ID being in dat.ids
 subset_dat <- dat[dat$CV_ID %in% dat.ids, ]
