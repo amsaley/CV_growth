@@ -224,8 +224,11 @@ dat = subset(full,
                CV_ID != 538 &
               shell.wt < 850)
 dat.ids = unique(dat[dat$dps == 36,]$CV_ID)
+
+common_ids <- dat.ids[dat.ids %in% dat.ids2]
+
 # Subset dat dataframe based on CV_ID being in dat.ids
-subset_dat <- dat[dat$CV_ID %in% dat.ids, ]
+subset_dat <- dat[dat$CV_ID %in% common_ids, ]
 
 unique(subset_dat$CV_ID)
 
