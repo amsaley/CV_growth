@@ -217,7 +217,9 @@ merging the growth + treatments + mass into one data frame; new df to use from h
 full = merge(growth_rate, mass, by = "CV_ID")
 dat = subset(full, 
              SA.start < 245 &
-             Net_growth > -5 &
+             Diff_growth > -20 &
+               Diff_growth < 50 &
+               Net_growth > -50 &
              `%oc.ic.shell` > 0 &
                CV_ID != 526&
                CV_ID != 536&
@@ -225,7 +227,7 @@ dat = subset(full,
               shell.wt < 850)
 dat.ids = unique(dat[dat$dps == 36,]$CV_ID)
 
-common_ids <- dat.ids[dat.ids %in% dat.ids2]
+common_ids <- dat.ids[dat.ids %in% dat.ids]
 
 # Subset dat dataframe based on CV_ID being in dat.ids
 subset_dat <- dat[dat$CV_ID %in% common_ids, ]
